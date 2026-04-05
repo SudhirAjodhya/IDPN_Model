@@ -1,0 +1,6 @@
+# Ignore log files and png files
+*.log
+*.png
+
+# Ignore the Chest X-Ray Datasets
+data/
