@@ -9,7 +9,10 @@ case "$1" in
     train)
         $PYTHON train.py
         ;;
+    downsampler_test)
+        $PYTHON -m src.models.downsamplers.implementation_test
+        ;;
     *)
-        echo "Usage: ./run.sh {test|train}"
+        echo "Usage: ./run.sh {test|train|max_pool_implementation_test}"
         exit 1
 esac

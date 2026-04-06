@@ -7,3 +7,6 @@ data_sets/
 
 # Ignore torch_env setup
 torch_env/
+
+# Ignore __pychache__
+__pychache__
