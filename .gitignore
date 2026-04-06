@@ -1,6 +1,7 @@
-# Ignore log files and png files
+# Ignore these files
 *.log
 *.png
+*.pyc
 
 # Ignore the Chest X-Ray Datasets
 data_sets/
@@ -9,4 +10,4 @@ data_sets/
 torch_env/
 
 # Ignore __pychache__
-__pychache__
+__pycache__
