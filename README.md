@@ -11,7 +11,7 @@ Therefore this project aims to implement a modular pipeline to compare:
 
 ## Directory Structure:
 ```bash
-Model/
+IDPN_Model/
 |--- data_sets/            # Various CXR data sets should go here
 |   |-- raw/               # Original DICOM png images
 |   |-- processed/         # Potentially pre-processed images (resized, normalized, and split (train/val/test))
@@ -32,9 +32,46 @@ Model/
 
 ## Getting Started:
 ### 1. Installation
-Clone the repository and install dependencies:
+Clone the repository:
 ```bash
 git clone https://github.com/SudhirAjodhya/IDPN_Model.git
-cd Model
-pip install requirements and dependencies
+```
+
+Create virtual environment and install dependencies:
+ ```bash
+ python -m venv torch_env   # Create virtual environment
+ ./torch_env/Scripts/python.exe -m pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu128](https://download.pytorch.org/whl/cu128)    # install GPU-enabled PyTorch in the root directory
+ ```
+
+ ### 2. Verify Installation:
+ **Local (Windows and Git bash)**
+ If the environment is activated `(torch_env)`:
+ ```bash
+ python run_test.py # Runs the test script to verify the install
+ ```
+
+ Alternatively, use the provided shell script:
+ ```bash
+ ./run.sh test
+ ```
+
+ Linux:
+ ```bash
+ make test
+ ```
+
+ ### 3. Running Project:
+If the environment is activated `(torch_env)`:
+```bash
+python <file_name>.py
+``` 
+
+Or, using the provided shell script:
+```bash
+./run.sh <file_name>.py
+```
+
+Or with the MakeFile, if make is installed:
+```bash
+make run file=<filename>.py
 ```

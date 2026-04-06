@@ -3,4 +3,7 @@
 *.png
 
 # Ignore the Chest X-Ray Datasets
-data/
+data_sets/
+
+# Ignore torch_env setup
+torch_env/
