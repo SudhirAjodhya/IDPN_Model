@@ -19,7 +19,7 @@ def visualize_image(df, image_number):
 
     # Extract nodule info
     row = df.iloc[image_number - 1]
-    image_name = "data_sets/JSRT/images\images/" + row["study_id"]
+    image_name = "data_sets/JSRT/images/images/" + row["study_id"]
     print(image_name)
     image = cv2.imread(image_name)
     x = int(row["x"])
