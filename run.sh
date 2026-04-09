@@ -12,7 +12,10 @@ case "$1" in
     downsampler_test)
         $PYTHON -m src.models.downsamplers.implementation_test
         ;;
+    jsrt_viz)
+        $PYTHON -m src.visualization.jsrt_nodule_viz
+        ;;
     *)
-        echo "Usage: ./run.sh {test|train|max_pool_implementation_test}"
+        echo "Usage: ./run.sh {test | train | max_pool_implementation_test | jsrt_viz}"
         exit 1
 esac
