@@ -58,7 +58,7 @@ class Config:
 
 def load_config(path: Path) -> Config:
     """
-    Load a YAML config fil into a typed Config dataclass
+    Load a YAML config file into a typed Config dataclass
     """
 
     with open(path) as file:
