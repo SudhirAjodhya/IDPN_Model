@@ -40,6 +40,7 @@ git clone https://github.com/SudhirAjodhya/IDPN_Model.git
 Create virtual environment and install dependencies:
  ```bash
  python -m venv torch_env   # Create virtual environment
+ source torch_env/Scripts/activate # Activating virtual environment in GitBash
  ./torch_env/Scripts/python.exe -m pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu128](https://download.pytorch.org/whl/cu128)    # install GPU-enabled PyTorch in the root directory
  ```
 
