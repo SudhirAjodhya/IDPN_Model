@@ -5,6 +5,10 @@
 
 # Ignore the Chest X-Ray Datasets
 data_sets/
+node21_view_test/
+
+# Ignore pretrained model weights
+/pretrained_models
 
 # Ignore torch_env setup
 torch_env/
