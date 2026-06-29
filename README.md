@@ -61,7 +61,27 @@ Create virtual environment and install dependencies:
  make test
  ```
 
- ### 3. Running Project:
+### 3. Data set downloads and layout:
+- JSRT [Download JSRT dataset HERE](https://www.kaggle.com/datasets/raddar/nodules-in-chest-xrays-jsrt)
+Place in /data_sets, structured as follows
+```python
+data_sets
+|--JSRT/
+|  |--images/
+|     |--images/
+```
+
+- NODE21 [Download Node21 dataset HERE](https://www.kaggle.com/datasets/pshikk/node-21-dataset-untampered)
+Place in /data_sets, structured as follows
+```python
+data_sets
+|--node21/
+|  |--cxr_images/
+|     |--original_data/
+|     |--procssed_data/
+```
+
+ ### 4. Running Project:
 If the environment is activated `(torch_env)`:
 ```bash
 python <file_name>.py
