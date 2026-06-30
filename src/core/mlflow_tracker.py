@@ -66,3 +66,8 @@ class MLFlowTracker:
         """
 
         mlflow.log_artifact(str(path))
+
+    def end_run(self):
+        if self.run is not None:
+            mlflow.end_run()
+            self.run = None
