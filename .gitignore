@@ -15,3 +15,6 @@ torch_env/
 
 # Ignore __pychache__
 __pycache__
+
+#mlflow
+mlflow.db

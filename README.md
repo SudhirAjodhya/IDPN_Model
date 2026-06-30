@@ -96,3 +96,16 @@ Or with the MakeFile, if make is installed:
 ```bash
 make run file=<filename>.py
 ```
+
+
+### 5. Running Test Scripts:
+```bash
+# Run a specific test file
+python -m pytest src/tests/test_config_loading.py -v
+
+# Run all tests
+python -m pytest src/tests/ -v
+
+# Run a specific test function
+python -m pytest src/tests/test_config_loading.py::test_set_seed_torch_reproducibility -v
+```

@@ -35,6 +35,7 @@ class TrainingConfig:
     scheduler: Dict[str, Any]
     early_stopping: EarlyStoppingConfig
     mixed_precision: bool
+    seed: int
 
 
 @dataclass
