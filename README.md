@@ -13,21 +13,22 @@ Therefore this project aims to implement a modular pipeline to compare:
 ```bash
 IDPN_Model/
 |--- data_sets/            # Various CXR data sets should go here
-|   |-- raw/               # Original DICOM png images
-|   |-- processed/         # Potentially pre-processed images (resized, normalized, and split (train/val/test))
+|   |-- JSRT               # JSRT Dataset
+|   |-- node21/            # Node21 Dataset
+|--- scripts/
+|--- outputs/               # Auto-generated results
+|   |-- models/            # Saved weights (.pth)
+|   |-- results/           # Graphs (AUC/ROC) and CSV logs
 |--- src/                  # Core logic and functionality
+|--- core/                 # configurations, logigng, mlflow init, registry and seeings
 |   |-- models/            
 |   |   |-- classifiers/   # Backbone network classification models (CNN, ResNet, ImageNet, EfficientDet)
 |   |   |-- downsamplers/  # Static and learnable downsamplers
 |   |-- data/              # Dataset classes and augmentation lgic
 |   |-- visualization/     # Nodule Visualization (Heatmaps, circled nodules etc.)
 |   |-- utils/             # Helper funtions (loggin, metrics etc.)
-|-- scripts/               # Entry point for execution
 |   |-- train.py           # Main training and evaluation script
-|-- outputs/               # Auto-generated results
-|   |-- models/            # Saved weights (.pth)
-|   |-- results/           # Graphs (AUC/ROC) and CSV logs
-|-- requirements.txt       # Project dependencies
+|--- requirements.txt       # Project dependencies
 ```
 
 ## Getting Started:
@@ -40,8 +41,8 @@ git clone https://github.com/SudhirAjodhya/IDPN_Model.git
 Create virtual environment and install dependencies:
  ```bash
  python -m venv torch_env   # Create virtual environment
+  ./torch_env/Scripts/python.exe -m pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu128](https://download.pytorch.org/whl/cu128)    # install GPU-enabled PyTorch in the root directory
  source torch_env/Scripts/activate # Activating virtual environment in GitBash
- ./torch_env/Scripts/python.exe -m pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu128](https://download.pytorch.org/whl/cu128)    # install GPU-enabled PyTorch in the root directory
  ```
 
  ### 2. Verify Installation:
