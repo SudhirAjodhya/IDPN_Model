@@ -1,4 +1,4 @@
-"""Post-hoc size-stratified evaluation for a trained checkpoint on Node21 test split.
+﻿"""Post-hoc size-stratified evaluation for a trained checkpoint on Node21 test split.
 
 Reads the bin lookup from `outputs/stratification/node21_nodule_sizes.csv`
 (produced by scripts/stratify_nodules.py). Emits per-bin + macro + micro
@@ -84,7 +84,7 @@ def main() -> None:
     out_path.write_text(json.dumps(result, indent=2))
 
     per = result["per_bin"]
-    print(f"\nSize-stratified sensitivity — {args.variant}")
+    print(f"\nSize-stratified sensitivity - {args.variant}")
     print(f"  S (<10mm):    {per['S']['sensitivity']!s:>8}  (n={per['S']['n_nodules']})")
     print(f"  M (10-20mm):  {per['M']['sensitivity']!s:>8}  (n={per['M']['n_nodules']})")
     print(f"  L (>=20mm):   {per['L']['sensitivity']!s:>8}  (n={per['L']['n_nodules']})")

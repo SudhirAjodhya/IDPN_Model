@@ -1,4 +1,4 @@
-"""
+﻿"""
 Table 4 aggregate plots for the Talebi reproduction.
 
 Two figures per backbone (mirrors paper Figure 5-ish view + a per-config bar):
@@ -15,7 +15,7 @@ Two figures per backbone (mirrors paper Figure 5-ish view + a per-config bar):
        error bars = seed range. Δ annotated above each pair.
 
 Both figures read the same list of per-run result dicts (see
-src/utils/results_aggregation_talebi_table4.py). Nothing here writes JSON —
+src/utils/results_aggregation_talebi_table4.py). Nothing here writes JSON -
 it consumes what the aggregator produces.
 """
 from __future__ import annotations

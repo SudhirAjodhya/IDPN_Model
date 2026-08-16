@@ -1,4 +1,4 @@
-"""Size-stratified sensitivity for Node21.
+﻿"""Size-stratified sensitivity for Node21.
 
 Post-hoc analysis: takes a trained detector + the Node21 test loader + the bin
 lookup produced by scripts/stratify_nodules.py, emits per-bin sensitivity plus
@@ -22,7 +22,7 @@ from src.data.nodule_sizes import BINS, bin_assignment
 
 def _load_bin_lookup(stratification_csv: str) -> Dict[str, str]:
     """Read stratify_nodules.py output → {img_name: bin}.
-    Assumes one nodule per image on the Node21 test split — for multi-nodule
+    Assumes one nodule per image on the Node21 test split - for multi-nodule
     images we bin by the first row's diameter (rare on Node21; if it matters,
     key on (img_name, x, y) instead)."""
     import pandas as pd
@@ -112,7 +112,7 @@ def _demo() -> None:
         heatmap_size = 128
         def eval(self): pass
         def __call__(self, x):
-            # Emit peak at pixel (64, 64) — hits centre_2048 == (1024, 1024) after scale=16.
+            # Emit peak at pixel (64, 64) - hits centre_2048 == (1024, 1024) after scale=16.
             B = x.shape[0]
             hm = torch.full((B, 1, 128, 128), -5.0)
             hm[:, 0, 64, 64] = 5.0

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Talebi & Milanfar (ICCV 2021) Table 4 configuration table.
 
 Ten rows per backbone (per paper Table 4, ResNet-50 and MobileNet-v2 columns):
@@ -12,7 +12,7 @@ Ten rows per backbone (per paper Table 4, ResNet-50 and MobileNet-v2 columns):
 Batch sizes match paper Table 4 exactly. Backbones = ResNet-50 + MobileNet-v2
 (the two we can afford in the 12h budget).
 
-The config table is deterministic; ordering matters — bilinear_224 must run
+The config table is deterministic; ordering matters - bilinear_224 must run
 first per (backbone, seed) so its checkpoint is available before any
 proposed_* run for that (backbone, seed).
 """

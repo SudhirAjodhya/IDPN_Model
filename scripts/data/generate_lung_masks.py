@@ -1,4 +1,4 @@
-"""
+﻿"""
 generate_lung_masks.py
 ======================
 Generate binary lung masks for JSRT + NODE21 training data using
@@ -84,7 +84,7 @@ def image_to_mask(image_path, seg_model, device, size=MASK_SIZE):
 
 def process_jsrt(seg_model, device):
     if not JSRT_CSV.exists():
-        print(f"JSRT CSV not found: {JSRT_CSV}  — skipping JSRT")
+        print(f"JSRT CSV not found: {JSRT_CSV}  - skipping JSRT")
         return
     df = pd.read_csv(JSRT_CSV)
     print(f"\nProcessing {len(df)} JSRT images...")
@@ -102,7 +102,7 @@ def process_jsrt(seg_model, device):
 
 def process_node21(seg_model, device):
     if not NODE21_CSV.exists():
-        print(f"NODE21 CSV not found: {NODE21_CSV}  — skipping NODE21")
+        print(f"NODE21 CSV not found: {NODE21_CSV}  - skipping NODE21")
         return
     all_images = [f for f in os.listdir(NODE21_IMAGE_DIR) if f.endswith(".mha")]
     print(f"\nProcessing {len(all_images)} NODE21 images...")

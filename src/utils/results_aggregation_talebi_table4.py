@@ -1,4 +1,4 @@
-"""
+﻿"""
 Aggregate per-run JSONs from the Talebi Table 4 sweep into a paper-format
 markdown table + delta summary, and call the Table 4 plot generators.
 
@@ -60,7 +60,7 @@ def _paper_table_md(backbone: str, runs: list[dict]) -> str:
                 lines.append(
                     f"| {backbone} | {cfg.resizer or 'bilinear'} "
                     f"| {cfg.input_res}×{cfg.input_res} | {cfg.target_res}×{cfg.target_res} "
-                    f"| {cfg.batch_size} | — | — | — | (no runs) |"
+                    f"| {cfg.batch_size} | - | - | - | (no runs) |"
                 )
                 continue
             gmacs = rs[0]["macs"] / 1e9
@@ -84,7 +84,7 @@ def _paper_table_md(backbone: str, runs: list[dict]) -> str:
         return lines
 
     hdr = [
-        f"# Talebi Table 4 — {backbone}",
+        f"# Talebi Table 4 - {backbone}",
         "",
         "Paper §4 recipe reproduced on ImageNette (10-class ImageNet subset).",
         "Errors are `100 - accuracy` to align with paper Table 4 direction (↓ better).",
@@ -115,14 +115,14 @@ def _paper_table_md(backbone: str, runs: list[dict]) -> str:
             delta = p_mean - b224_mean  # negative = better (lower err)
             lines.append(f"| {cfg.label} vs bilinear_224 | {delta:+.2f} |")
     else:
-        lines.append("| (bilinear_224 runs missing — cannot compute Δ) |  |")
+        lines.append("| (bilinear_224 runs missing - cannot compute Δ) |  |")
 
     return "\n".join(lines) + "\n"
 
 
 def _cross_backbone_md(backbones: list[str]) -> str:
     """One-page summary across all backbones: headline Δ at the paper's best row."""
-    lines = ["# Talebi Table 4 — All Backbones", "",
+    lines = ["# Talebi Table 4 - All Backbones", "",
              "Headline: bilinear-224 vs proposed_368→224 (paper's best row for R50).", ""]
     lines += ["| Backbone | Bilinear-224 top-1 err (%) | Proposed 368→224 top-1 err (%) "
               "| Δ top-1 err (pp) | Paper Δ (pp) |",
@@ -132,7 +132,7 @@ def _cross_backbone_md(backbones: list[str]) -> str:
     for bb in backbones:
         runs = _load_runs(bb)
         if not runs:
-            lines.append(f"| {bb} | — | — | — | {paper_deltas.get(bb, '?')} |")
+            lines.append(f"| {bb} | - | - | - | {paper_deltas.get(bb, '?')} |")
             continue
         by_cfg = defaultdict(list)
         for r in runs:
@@ -140,9 +140,9 @@ def _cross_backbone_md(backbones: list[str]) -> str:
         b224 = [100.0 - r["final_val_top1"] for r in by_cfg.get("bilinear_224", [])]
         p368 = [100.0 - r["final_val_top1"] for r in by_cfg.get("proposed_368", [])]
         if not b224 or not p368:
-            lines.append(f"| {bb} | {statistics.mean(b224) if b224 else '—'} "
-                         f"| {statistics.mean(p368) if p368 else '—'} "
-                         f"| — | {paper_deltas.get(bb, '?')} |")
+            lines.append(f"| {bb} | {statistics.mean(b224) if b224 else '-'} "
+                         f"| {statistics.mean(p368) if p368 else '-'} "
+                         f"| - | {paper_deltas.get(bb, '?')} |")
             continue
         bm, pm = statistics.mean(b224), statistics.mean(p368)
         lines.append(f"| {bb} | {bm:.2f} | {pm:.2f} | {pm - bm:+.2f} "
@@ -157,7 +157,7 @@ def summarize(backbones: list[str] | None = None) -> None:
     for bb in backbones:
         runs = _load_runs(bb)
         if not runs:
-            print(f"[{bb}] no completed runs — skipping")
+            print(f"[{bb}] no completed runs - skipping")
             continue
         md = _paper_table_md(bb, runs)
         out = backbone_dir(bb) / "TABLE4.md"

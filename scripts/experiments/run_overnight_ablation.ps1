@@ -1,9 +1,9 @@
-# run_overnight_ablation.ps1
+﻿# run_overnight_ablation.ps1
 # Answers two things:
 #   1. Does datasets=both reproduce matrix_v1's ~0.46 Node21 test sens?
 #      (Confirms the "JSRT augmentation is the whole gap" hypothesis)
 #   2. Does Talebi beat bilinear cleanly on BOTH data regimes?
-#      (The actual thesis claim — replicated across regimes tightens the story)
+#      (The actual thesis claim - replicated across regimes tightens the story)
 #
 # All runs: seed 42, target=224, input=2048, batch=2, patience=15, --froc.
 # ~5-6h per run at input=2048, batch=2 on RTX 5070 Ti. Total ~15-18h.
@@ -17,7 +17,7 @@ if (-not (Test-Path $LOG_ROOT)) { New-Item -ItemType Directory -Path $LOG_ROOT |
 $STAMP = Get-Date -Format "yyyy-MM-dd_HHmm"
 $LOG   = Join-Path $LOG_ROOT "run_$STAMP.log"
 
-# (variant, datasets) tuples — order matters if you want partial results early.
+# (variant, datasets) tuples - order matters if you want partial results early.
 $RUNS = @(
     @{ variant = "bilinear";       datasets = "both"   },   # 1. matrix_v1 replication
     @{ variant = "node21_talebi";  datasets = "both"   },   # 2. Talebi on Combined

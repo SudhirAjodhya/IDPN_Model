@@ -1,11 +1,11 @@
-import torch
+﻿import torch
 import torch.nn.functional as F
 
 def diagnose_alpha(model, image_batch, lung_bbox, mediastinum_bbox):
     """
     For Variant alpha: measure |residual| in lung region vs mediastinum region.
     A ratio meaningfully != 1.0 means the residual is content-aware.
-    Also reports absolute magnitudes — the ratio alone is misleading when
+    Also reports absolute magnitudes - the ratio alone is misleading when
     both regions are tiny.
     lung_bbox, mediastinum_bbox: (y0, y1, x0, x1) in 512-space
     """
@@ -62,7 +62,7 @@ def diagnose_gamma(model, image_batch, lung_bbox, mediastinum_bbox):
     my0, my1, mx0, mx1 = mediastinum_bbox
     med_entropy = entropy_per_block[:, :, my0:my1, mx0:mx1].mean().item()
 
-    # Raw weight stats — entropy alone doesn't say HOW uniform the weights are.
+    # Raw weight stats - entropy alone doesn't say HOW uniform the weights are.
     # Uniform weight = 1/16 = 0.0625; "peaked" block = max weight > 2/16 = 0.125.
     max_weight = weights_flat.max(dim=-1).values.mean().item()
     min_weight = weights_flat.min(dim=-1).values.mean().item()
@@ -128,7 +128,7 @@ def diagnose_bilinear_mse(model, image_batch):
     """
     Compute MSE between the mechanism's 512x512 output and bilinear's 512x512 output.
     If MSE approx 0, the mechanism is functionally identical to bilinear.
-    For alpha/gamma only — gamma-in-net's LDM lives inside the backbone (see
+    For alpha/gamma only - gamma-in-net's LDM lives inside the backbone (see
     diagnose_innet_bilinear_mse).
     """
     model.eval()
@@ -218,7 +218,7 @@ def diagnose_talebi(model, image_batch, lung_bbox, mediastinum_bbox, target_size
     """
     Residual magnitude, spatial distribution (lung/mediastinum), MSE vs bilinear.
     lung_bbox, mediastinum_bbox: (y0, y1, x0, x1) in target_size-space.
-    target_size defaults to whatever the resizer actually emits — avoids the
+    target_size defaults to whatever the resizer actually emits - avoids the
     hardcoded 512 crashing when target=224 was set from CLI.
     """
     ldm = model.ldm

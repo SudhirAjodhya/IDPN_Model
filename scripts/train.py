@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import json
 import math
 import os
@@ -149,7 +149,7 @@ def main():
     optimizer = torch.optim.AdamW([
         {"params": backbone_params, "lr": args.lr * args.backbone_lr_factor},
         {"params": other_params, "lr": args.lr},
-    ], weight_decay=0.05)   # matches matrix_v1 — 1e-4 was too weak and let params drift
+    ], weight_decay=0.05)   # matches matrix_v1 - 1e-4 was too weak and let params drift
 
     scheduler = None
     if args.cosine_lr:

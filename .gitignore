@@ -41,6 +41,7 @@ outputs/*
 *.csv
 *.jpeg
 
+.claude
 /graphify-out
 
 # poc testing

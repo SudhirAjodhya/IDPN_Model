@@ -1,4 +1,4 @@
-# run_multiseed_ablation.ps1
+﻿# run_multiseed_ablation.ps1
 # Extends 2026-08-10 ablation_v1 to n=3 on the augmented, fixed pipeline.
 #
 # Three variants x three seeds on datasets=both, input=2048, target=224,
@@ -46,7 +46,7 @@ $RUNS = @(
     @{ variant = "bilinear";      seed = 123 },   # 5. bilinear s123
     @{ variant = "node21_talebi"; seed = 123 },   # 6. paper-faithful s123
     @{ variant = "talebi";        seed = 123 }    # 7. zero-init s123
-    # Optional reruns (skip if reusing ablation_v1 s42) — uncomment and put a
+    # Optional reruns (skip if reusing ablation_v1 s42) - uncomment and put a
     # comma at the end of the preceding row if enabling either:
     # @{ variant = "bilinear";      seed = 42  }
     # @{ variant = "node21_talebi"; seed = 42  }

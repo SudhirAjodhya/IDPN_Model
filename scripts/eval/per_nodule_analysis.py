@@ -1,4 +1,4 @@
-"""
+﻿"""
 per_nodule_analysis.py
 ======================
 Per-nodule analysis on saved checkpoints.
@@ -32,7 +32,7 @@ INPUT_SIZE = 2048
 SCORE_THRESH = 0.3
 HEATMAP_SIZE = 128
 
-# Point to output directory — adjust group path as needed
+# Point to output directory - adjust group path as needed
 OUTPUT_DIR = ROOT_DIR / "outputs"
 
 
@@ -55,7 +55,7 @@ def analyse_checkpoint(name, ckpt_path, test_loader):
     variant = "bilinear" if "bilinear" in name else "talebi"
     print(f"\n  Loading {name} from {ckpt_path}")
     if not ckpt_path.exists():
-        print(f"    MISSING — skipping")
+        print(f"    MISSING - skipping")
         return []
 
     model = NoduleDetector(downsampler_type=variant, backbone_type="convnext_tiny", head_type="centernet").to(DEVICE)
@@ -118,7 +118,7 @@ def cross_compare(results, seed):
 def main():
     print("Per-nodule analysis on checkpoints")
 
-    # Build JSRT test loader (seed=42, test_seed=0 — same split as training)
+    # Build JSRT test loader (seed=42, test_seed=0 - same split as training)
     data_root = ROOT_DIR / "data_sets"
     _, _, test_loaders, _ = build_three_way_split(
         jsrt_csv_path=data_root / "JSRT" / "jsrt_metadata.csv",

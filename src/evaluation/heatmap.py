@@ -1,4 +1,4 @@
-import torch
+﻿import torch
 import math
 
 def render_gaussian_heatmap_direct(centers_x, centers_y, radiuses, has_nodule,
@@ -7,7 +7,7 @@ def render_gaussian_heatmap_direct(centers_x, centers_y, radiuses, has_nodule,
     Renders Gaussian blobs centered at given coordinates directly on device.
 
     Shape (B, 1, H, W) to match CenterNetHead output. Without the channel dim,
-    focal_v5(pred=(B,1,H,W), target=(B,H,W)) broadcasts to (B,B,H,W) — a
+    focal_v5(pred=(B,1,H,W), target=(B,H,W)) broadcasts to (B,B,H,W) - a
     cross-batch product that corrupts gradients (pred[i] gets supervised by
     target[j] for all j). This was the reason Node21-only sensitivity plateaued
     at ~0.28 vs matrix_v1's 0.46 on the same test set.
@@ -36,7 +36,7 @@ def render_gaussian_heatmap_direct(centers_x, centers_y, radiuses, has_nodule,
 def make_gt_heatmap(targets, batch_size, heatmap_size, sigma_min=2.5, input_size=2048, device="cpu"):
     scale = heatmap_size / input_size
     # After default_collate, center_2048 is a 2-tuple (cx_tensor, cy_tensor), each
-    # of length B — NOT a per-sample list of pairs. Prior indexing target[i][0]/[1]
+    # of length B - NOT a per-sample list of pairs. Prior indexing target[i][0]/[1]
     # worked by accident at B=1, silently swapped cx/cy across samples at B=2, and
     # IndexErrors at B>=3. Match detection_metrics.py which had it right.
     cx_batch = targets["center_2048"][0]
@@ -61,7 +61,7 @@ def make_gt_heatmap(targets, batch_size, heatmap_size, sigma_min=2.5, input_size
         device=device,
     )
     # Normalize each item's Gaussian so the peak == 1.0. See directionB line 532.
-    # hm is (B, 1, H, W) — normalize per-item over the spatial dims (2, 3).
+    # hm is (B, 1, H, W) - normalize per-item over the spatial dims (2, 3).
     peak = hm.amax(dim=(2, 3), keepdim=True)
     hm = hm / (peak + 1e-8)
     return hm

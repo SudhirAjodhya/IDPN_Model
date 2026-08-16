@@ -1,4 +1,4 @@
-# run_frozen_backbone_control.ps1
+﻿# run_frozen_backbone_control.ps1
 # Diagnostic: freeze the pretrained ConvNeXt-T backbone (backbone_lr_factor 0.0)
 # and train ONLY the resizer + head. Isolates "does the resizer contribute
 # detection signal" from "does the backbone adapt to accommodate the resizer."
@@ -13,7 +13,7 @@
 # clean n=3 for the primary comparison alongside these frozen-backbone results.
 #
 # Order:
-#   1. talebi s123 (trainable backbone) — closes ablation_v2 n=3
+#   1. talebi s123 (trainable backbone) - closes ablation_v2 n=3
 #   2. frozen bilinear s42            (baseline for the frozen-backbone regime)
 #   3. frozen node21_talebi s42       (paper-faithful under frozen backbone)
 #   4. frozen talebi s42              (zero-init under frozen backbone)
@@ -38,8 +38,8 @@ function Run($label, $args_) {
         Tee-Object -FilePath $LOG -Append
     $ErrorActionPreference = $prev
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "!! $label failed with exit code $LASTEXITCODE — continuing to next" -ForegroundColor Red
-        "!! $label failed with exit code $LASTEXITCODE — continuing to next" | Add-Content $LOG
+        Write-Host "!! $label failed with exit code $LASTEXITCODE - continuing to next" -ForegroundColor Red
+        "!! $label failed with exit code $LASTEXITCODE - continuing to next" | Add-Content $LOG
     }
 }
 

@@ -1,4 +1,4 @@
-import cv2
+﻿import cv2
 import numpy as np
 import pandas as pd
 import torch
@@ -35,7 +35,7 @@ class JSRTDataset(Dataset):
         self.augment = augment # Flag for if we are doing data augmentation  - false by default
         self.input_size = input_size
         self.pixel_spacing_mm = pixel_spacing_mm
-        self.clahe = clahe   # applied ALWAYS (train + val + test) — it's a normalization, not aug
+        self.clahe = clahe   # applied ALWAYS (train + val + test) - it's a normalization, not aug
 
     def __len__(self):
         return len(self.df)

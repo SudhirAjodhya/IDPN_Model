@@ -1,4 +1,4 @@
-import cv2
+﻿import cv2
 import SimpleITK as sitk
 import pandas as pd
 import numpy as np
@@ -13,7 +13,7 @@ class NODE21Dataset(Dataset):
         self.images_root = Path(images_root)
         self.augment = augment
         self.input_size = input_size
-        self.clahe = clahe   # applied ALWAYS (train + val + test) — it's a normalization, not data aug
+        self.clahe = clahe   # applied ALWAYS (train + val + test) - it's a normalization, not data aug
 
         # Auto-detect sibling '<images_root>_npy' cache written by scripts/cache_node21_npy.py.
         # Using it skips SimpleITK decode + normalize per __getitem__ (5-10x speedup, tiny RAM).
@@ -41,13 +41,13 @@ class NODE21Dataset(Dataset):
     def _load_native(self, img_name, want_clahe=False):
         """Return native float32 [0,1] array. Two-tier cache: post-CLAHE, then raw."""
         stem = Path(img_name).stem
-        # Tier 1: post-CLAHE cache — skips both raw load AND CLAHE compute.
+        # Tier 1: post-CLAHE cache - skips both raw load AND CLAHE compute.
         # Stored as uint16 (lossless for CLAHE output, halves disk vs float32).
         if want_clahe and (cdir := self._clahe_cache_dir()) is not None:
             cpath = cdir / f"{stem}.npy"
             if cpath.exists():
                 return np.load(cpath).astype(np.float32) / 65535.0
-        # Tier 2: raw npy cache — skips SimpleITK decode + normalize.
+        # Tier 2: raw npy cache - skips SimpleITK decode + normalize.
         if self.npy_cache_dir is not None:
             rpath = self.npy_cache_dir / f"{stem}.npy"
             if rpath.exists():

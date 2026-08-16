@@ -1,4 +1,4 @@
-# run_node21_talebi_vs_bilinear.ps1
+﻿# run_node21_talebi_vs_bilinear.ps1
 # Node21-only head-to-head: bilinear vs node21_talebi (paper-faithful TalebiPaperResizer).
 # One seed (42). ConvNeXt-T backbone, target 512 (matches matrix_v1 defaults).
 # Approx ~4h per run on RTX 5070 Ti -> ~8h total.
@@ -13,7 +13,7 @@ $RUN_GROUP   = "node21_only_v1"
 $EPOCHS      = 50
 $PATIENCE    = 15
 $TARGET_SIZE = 224   # paper Talebi standard. Set to 256 for the alt run if desired.
-$INPUT_SIZE  = 1024  # Node21 native res — no upsample, ~4x less loader work than the legacy 2048.
+$INPUT_SIZE  = 1024  # Node21 native res - no upsample, ~4x less loader work than the legacy 2048.
 
 $LOG_ROOT = Join-Path "outputs" "node21_only_v1"
 if (-not (Test-Path $LOG_ROOT)) { New-Item -ItemType Directory -Path $LOG_ROOT | Out-Null }
@@ -32,7 +32,7 @@ function Run($label, $args_) {
     if ($LASTEXITCODE -ne 0) { throw "$label failed with exit code $LASTEXITCODE" }
 }
 
-# Build the Node21 .npy cache once — idempotent, skips already-cached files.
+# Build the Node21 .npy cache once - idempotent, skips already-cached files.
 # Loader auto-detects the sibling _npy dir. ~5-10x IO speedup vs SimpleITK per __getitem__.
 $N21_CSV    = "data_sets/node21/cxr_images/original_data/metadata.csv"
 $N21_IMAGES = "data_sets/node21/cxr_images/original_data/images"
@@ -40,7 +40,7 @@ Write-Host "Ensuring Node21 npy cache..." -ForegroundColor Yellow
 & python scripts/data/cache_node21_npy.py --node21-csv $N21_CSV --node21-images $N21_IMAGES --workers 6
 if ($LASTEXITCODE -ne 0) { throw "Node21 npy cache build failed." }
 
-# Smoke test — fails fast if the pipeline is broken.
+# Smoke test - fails fast if the pipeline is broken.
 Write-Host "Running smoke test..." -ForegroundColor Yellow
 & python scripts/diagnostics/smoke_test_node21_pipeline.py
 if ($LASTEXITCODE -ne 0) { throw "Smoke test failed. Aborting sweep." }

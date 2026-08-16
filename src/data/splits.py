@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import numpy as np
 from torch.utils.data import ConcatDataset
 
@@ -17,23 +17,23 @@ def build_three_way_split(jsrt_csv_path, jsrt_image_dir, node21_csv_path, node21
     Build train / val / test splits.
 
     datasets:
-      "both"   — legacy JSRT+NODE21 pipeline (Combined = JSRT + NODE21). Preserved for
+      "both"   - legacy JSRT+NODE21 pipeline (Combined = JSRT + NODE21). Preserved for
                  reproducing existing matrix_v1 / n=5 Talebi results.
-      "node21" — Node21-only pipeline. JSRT loaders skipped; test_loaders["combined"]
+      "node21" - Node21-only pipeline. JSRT loaders skipped; test_loaders["combined"]
                  is aliased to the Node21 test set so downstream callers (train.py,
                  eval scripts) still find a "combined" key without special-casing.
                  test_loaders["jsrt"] is omitted in this mode.
 
     Split ratios per dataset:
-      JSRT   — Train 0.70 / Val 0.10 / Test 0.20 (of both nodule and normal strata)
-      NODE21 — Train ~0.80 / Val 0.10 / Test 0.10 (of both strata)
+      JSRT   - Train 0.70 / Val 0.10 / Test 0.20 (of both nodule and normal strata)
+      NODE21 - Train ~0.80 / Val 0.10 / Test 0.10 (of both strata)
 
     test_seed is FIXED across experiments so the test set is stable; seed varies the
     train/val split within the non-test remainder.
     """
     assert datasets in ("both", "node21"), f"unknown datasets={datasets!r}"
 
-    # NODE21 — always built.
+    # NODE21 - always built.
     node21_df = pd.read_csv(node21_csv_path, index_col=0)
     pos_mask = node21_df["label"] == 1  # 1 = positive nodule, 0 = negative image
 

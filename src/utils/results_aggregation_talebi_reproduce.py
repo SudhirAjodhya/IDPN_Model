@@ -1,4 +1,4 @@
-"""
+﻿"""
 Results aggregation for the Talebi reproduction experiment.
 
 Parses per-phase per-seed JSON result files and generates a Markdown
@@ -30,7 +30,7 @@ def summarize(result_dir: Path | None = None) -> None:
             rows[d["phase"]].append(d)
 
     lines = [
-        "# Talebi Reproduce v1 — Results", "",
+        "# Talebi Reproduce v1 - Results", "",
         "Paper headline (ResNet-50, ImageNet-1k):",
         "  bilinear-224 top-1 err 24.7%  ->  proposed 368->224 top-1 err 23.0%",
         "  **paper Delta = +1.7 pp top-1**",

@@ -1,8 +1,8 @@
-"""
+﻿"""
 Classification training curve visualizations for the Talebi Table 4 reproduction.
 
 Per-run panels:
-  - Loss curve (train + val on the same axis) — the overfit-detection view
+  - Loss curve (train + val on the same axis) - the overfit-detection view
   - Accuracy curve (train top-1, val top-1, val top-5)
   - Learning rate schedule (log scale)
 
@@ -43,7 +43,7 @@ def save_classification_curves(epoch_logs: list[dict], output_dir: Path,
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-    # Panel 1: loss curves (train vs val) — the overfitting-detection panel
+    # Panel 1: loss curves (train vs val) - the overfitting-detection panel
     axes[0].plot(epochs, train_loss, "b-", label="Train Loss")
     if has_val_loss:
         axes[0].plot(epochs, val_loss, "r-", label="Val Loss")
@@ -135,7 +135,7 @@ def save_phase_comparison(phase_a_logs: list[dict], phase_b_logs: list[dict],
     axes[0].plot(ep_a, val_a, "b-", label=f"Phase A (Bilinear 224): {val_a[-1]:.2f}%")
     axes[0].plot(ep_b, val_b, "r-", label=f"Phase B (Talebi 368→224): {val_b[-1]:.2f}%")
     delta = val_b[-1] - val_a[-1]
-    axes[0].set_title(f"Val Top-1 Accuracy — Seed {seed}  (Δ = {delta:+.2f} pp)")
+    axes[0].set_title(f"Val Top-1 Accuracy - Seed {seed}  (Δ = {delta:+.2f} pp)")
     axes[0].set_xlabel("Epoch")
     axes[0].set_ylabel("Top-1 Accuracy (%)")
     axes[0].legend()
@@ -143,7 +143,7 @@ def save_phase_comparison(phase_a_logs: list[dict], phase_b_logs: list[dict],
 
     axes[1].plot(ep_a, loss_a, "b-", label="Phase A")
     axes[1].plot(ep_b, loss_b, "r-", label="Phase B")
-    axes[1].set_title(f"Training Loss — Seed {seed}")
+    axes[1].set_title(f"Training Loss - Seed {seed}")
     axes[1].set_xlabel("Epoch")
     axes[1].set_ylabel("Loss")
     axes[1].legend()
@@ -185,7 +185,7 @@ def save_seed_comparison(results: dict[int, dict], output_dir: Path) -> None:
                     color="green" if delta > 0 else "red")
 
     mean_delta = sum(deltas) / len(deltas)
-    ax.set_title(f"Talebi Reproduction — Mean Δ Top-1 = {mean_delta:+.2f} pp")
+    ax.set_title(f"Talebi Reproduction - Mean Δ Top-1 = {mean_delta:+.2f} pp")
     ax.set_xlabel("Seed")
     ax.set_ylabel("Val Top-1 Accuracy (%)")
     ax.set_xticks(x)
