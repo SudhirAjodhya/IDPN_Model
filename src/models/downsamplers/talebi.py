@@ -19,10 +19,13 @@ class _TalebiResBlock(nn.Module):
         return x + self.block(x)
 
 
+@DOWNSAMPLER_REGISTRY.register("node21_talebi")
 class TalebiPaperResizer(nn.Module):
     """
-    Implementation of Talebi Resizer from 2021 paper for ImageNet classification to determine that this
-    is a paper faithful implementation of the Resizer, before adapting for CXRs
+    Paper-faithful Talebi resizer (Talebi & Milanfar, ICCV 2021, Figure 3)
+    Registered as "node21_talebi" for the Node21-only training track - chosen to
+    disambiguate from the pre-existing "talebi" key (zero-init variant used in
+    matrix_v1 on JSRT+NODE21 mixed pipeline).
     """
 
     def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224):
@@ -78,6 +81,125 @@ class TalebiPaperResizer(nn.Module):
         return x_bilinear + residual
 
 
+
+
+@DOWNSAMPLER_REGISTRY.register("node21_talebi_zeroinit")
+class TalebiPaperResizerZeroInit(TalebiPaperResizer):
+    """
+    Paper-faithful Talebi with near-zero init on output_conv (kaiming * 0.01, bias = 0). At step 1 residual ~= 0 so model output ~= bilinear -- Talebi
+    starts strictly >= bilinear and can only improve. Same near-zero pattern that talebi_saliency + talebi_inverse_bone use after v6->v7's "pure zero
+    kills upstream gradients" finding.
+    """
+    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224):
+        super().__init__(in_channels=in_channels, n_filters=n_filters, n_blocks=n_blocks, target_size=target_size)
+
+        nn.init.kaiming_normal_(self.output_conv.weight, a=0.2)
+        self.output_conv.weight.data *= 0.01
+        nn.init.zeros_(self.output_conv.bias)
+
+
+# ==============================================================================
+# Zero-init Talebi + Swin-style attention-subtraction branch
+# ==============================================================================
+# Matches node21_talebi_zeroinit architecture exactly (paper-faithful processing
+# at target resolution, near-zero output_conv init). Only difference: adds an
+# attention branch that operates at attn_res (default 128), captures globally-
+# consistent content via WMSA+SWMSA, and gets SUBTRACTED from the conv branch
+# before output_conv. Motivation: paper-faithful residual under-attends nodules
+# (2026-08-15 diagnostic: nodule_ratio 0.699, ratio-of-ratios 0.553). Global-
+# subtraction should suppress background structure, leaving nodule-scale detail.
+#
+# At init: attention branch has default MHA/LN/MLP init (not zeroed); output_conv
+# is near-zero-kaiming so total residual ~= 0 regardless of what f_conv - f_attn
+# looks like -> model output ~= bilinear at step 1. Same "at least bilinear at
+# init" guarantee as node21_talebi_zeroinit.
+# ==============================================================================
+
+class _WindowAttention(nn.Module):
+    def __init__(self, dim, num_heads):
+        super().__init__()
+        self.attn = nn.MultiheadAttention(dim, num_heads, batch_first=True)
+
+    def forward(self, x):  # (B*num_windows, ws*ws, C)
+        out, _ = self.attn(x, x, x, need_weights=False)
+        
+        return out
+
+
+class _SwinLikeBlock(nn.Module):
+    """One Swin block = WMSA + MLP + SWMSA + MLP. GELU in MLPs.
+    ponytail: no cyclic-shift attention mask; edge windows will see wrap-mixed
+    content, which on centered CXRs at 128x128 is a minor artifact. Add mask
+    if attention viz shows edge issues."""
+    def __init__(self, dim, window_size=8, num_heads=2, mlp_ratio=2.0):
+        super().__init__()
+        self.window_size = window_size
+        h = int(dim * mlp_ratio)
+        self.norm1 = nn.LayerNorm(dim); self.wmsa  = _WindowAttention(dim, num_heads)
+        self.norm2 = nn.LayerNorm(dim); self.mlp1  = nn.Sequential(nn.Linear(dim, h), nn.GELU(), nn.Linear(h, dim))
+        self.norm3 = nn.LayerNorm(dim); self.swmsa = _WindowAttention(dim, num_heads)
+        self.norm4 = nn.LayerNorm(dim); self.mlp2  = nn.Sequential(nn.Linear(dim, h), nn.GELU(), nn.Linear(h, dim))
+
+    def _window_attn(self, x, attn_module, shift):
+        B, H, W, C = x.shape
+        ws = self.window_size
+        assert H % ws == 0 and W % ws == 0, f"H, W must be divisible by window_size={ws} (got {H}x{W})"
+        if shift:
+            x = torch.roll(x, shifts=(-shift, -shift), dims=(1, 2))
+        # partition to non-overlapping windows: (B, H/ws, ws, W/ws, ws, C) -> (B*nw, ws*ws, C)
+        x = x.view(B, H // ws, ws, W // ws, ws, C).permute(0, 1, 3, 2, 4, 5).contiguous()
+        x = x.view(-1, ws * ws, C)
+        out = attn_module(x)                                     # attention within each window
+        out = out.view(B, H // ws, W // ws, ws, ws, C).permute(0, 1, 3, 2, 4, 5).contiguous()
+        out = out.view(B, H, W, C)
+        if shift:
+            out = torch.roll(out, shifts=(shift, shift), dims=(1, 2))
+        return out
+
+    def forward(self, x):                                        # (B, C, H, W)
+        x = x.permute(0, 2, 3, 1)                                # (B, H, W, C) for LN/attn
+        x = x + self._window_attn(self.norm1(x), self.wmsa,  shift=0)
+        x = x + self.mlp1(self.norm2(x))
+        x = x + self._window_attn(self.norm3(x), self.swmsa, shift=self.window_size // 2)
+        x = x + self.mlp2(self.norm4(x))
+        return x.permute(0, 3, 1, 2).contiguous()                # (B, C, H, W)
+
+
+@DOWNSAMPLER_REGISTRY.register("node21_talebi_zeroinit_attn")
+class TalebiPaperResizerZeroInitAttn(TalebiPaperResizer):
+    """Paper-faithful zero-init Talebi + attention-subtraction branch. See block comment above."""
+    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224,
+                 attn_res=128, attn_window=8, attn_heads=2):
+        super().__init__(in_channels=in_channels, n_filters=n_filters,
+                         n_blocks=n_blocks, target_size=target_size)
+        # zero-init the residual (same as node21_talebi_zeroinit)
+        nn.init.kaiming_normal_(self.output_conv.weight, a=0.2)
+        self.output_conv.weight.data *= 0.01
+        nn.init.zeros_(self.output_conv.bias)
+
+        # attention branch (new)
+        assert attn_res % attn_window == 0, f"attn_res={attn_res} must be divisible by attn_window={attn_window}"
+        self.attn_res  = attn_res
+        self.attention = _SwinLikeBlock(dim=n_filters, window_size=attn_window, num_heads=attn_heads)
+
+    def forward(self, x):
+        # Paper-faithful path up through inner-skip, identical to base zeroinit
+        x_bilinear = F.interpolate(x, size=(self.target_size,) * 2, mode="bilinear", align_corners=False)
+        f = self.input_conv(x)                                                # at native res
+        f = F.interpolate(f, size=(self.target_size,) * 2, mode="bilinear", align_corners=False)
+        f_skip = f
+        f_conv = self.res_blocks(f)
+        f_conv = self.post(f_conv)
+        f_conv = f_conv + f_skip                                              # inner skip at target
+
+        # Attention branch: down to attn_res, Swin, up to target. Captures globally-consistent content.
+        f_attn = F.interpolate(f, size=(self.attn_res,) * 2, mode="bilinear", align_corners=False)
+        f_attn = self.attention(f_attn)
+        f_attn = F.interpolate(f_attn, size=(self.target_size,) * 2, mode="bilinear", align_corners=False)
+
+        # Subtract global from local, then zero-init residual projection
+        residual = self.output_conv(f_conv - f_attn)
+        return x_bilinear + residual
 
 
 @DOWNSAMPLER_REGISTRY.register("talebi")
