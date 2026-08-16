@@ -122,15 +122,16 @@ class _WindowAttention(nn.Module):
 
     def forward(self, x):  # (B*num_windows, ws*ws, C)
         out, _ = self.attn(x, x, x, need_weights=False)
-        
+
         return out
 
 
 class _SwinLikeBlock(nn.Module):
-    """One Swin block = WMSA + MLP + SWMSA + MLP. GELU in MLPs.
-    ponytail: no cyclic-shift attention mask; edge windows will see wrap-mixed
-    content, which on centered CXRs at 128x128 is a minor artifact. Add mask
-    if attention viz shows edge issues."""
+    """
+    One Swin block = WMSA + MLP + SWMSA + MLP. GELU in MLPs. ponytail: no cyclic-shift attention mask; edge windows will see wrap-mixed content, which on centered CXRs at 128x128 is a minor artifact. 
+    Add mask if attention viz shows edge issues
+    """
+
     def __init__(self, dim, window_size=8, num_heads=2, mlp_ratio=2.0):
         super().__init__()
         self.window_size = window_size
@@ -144,16 +145,20 @@ class _SwinLikeBlock(nn.Module):
         B, H, W, C = x.shape
         ws = self.window_size
         assert H % ws == 0 and W % ws == 0, f"H, W must be divisible by window_size={ws} (got {H}x{W})"
+
         if shift:
             x = torch.roll(x, shifts=(-shift, -shift), dims=(1, 2))
+
         # partition to non-overlapping windows: (B, H/ws, ws, W/ws, ws, C) -> (B*nw, ws*ws, C)
         x = x.view(B, H // ws, ws, W // ws, ws, C).permute(0, 1, 3, 2, 4, 5).contiguous()
         x = x.view(-1, ws * ws, C)
         out = attn_module(x)                                     # attention within each window
         out = out.view(B, H // ws, W // ws, ws, ws, C).permute(0, 1, 3, 2, 4, 5).contiguous()
         out = out.view(B, H, W, C)
+
         if shift:
             out = torch.roll(out, shifts=(shift, shift), dims=(1, 2))
+
         return out
 
     def forward(self, x):                                        # (B, C, H, W)
@@ -162,6 +167,7 @@ class _SwinLikeBlock(nn.Module):
         x = x + self.mlp1(self.norm2(x))
         x = x + self._window_attn(self.norm3(x), self.swmsa, shift=self.window_size // 2)
         x = x + self.mlp2(self.norm4(x))
+
         return x.permute(0, 3, 1, 2).contiguous()                # (B, C, H, W)
 
 

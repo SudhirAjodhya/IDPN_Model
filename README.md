@@ -17,7 +17,7 @@ This project implements a modular, config-driven framework to systematically com
 
 ## Repository Structure
 
-```
+```bash
 Model/
 ├── configs/                       # Declarative YAML experiment configs
 │   ├── base.yaml
