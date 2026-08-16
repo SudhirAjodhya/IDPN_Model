@@ -1,0 +1,37 @@
+experiment:
+  name: "talebi_reproduce_v1"
+  paper: "Talebi & Milanfar, ICCV 2021"
+
+data:
+  dataset: "imagenette"
+  data_root: "data_sets/imagenette2/imagenette2"
+
+phases:
+  A:
+    input_res: 224
+    target_res: 224
+    batch_size: 128
+    resizer: null
+  B:
+    input_res: 368
+    target_res: 224
+    batch_size: 48
+    resizer:
+      type: "talebi_paper"
+      in_channels: 3
+      n_filters: 16
+      n_blocks: 1
+
+training:
+  optimizer: "sgd"
+  lr: 0.05
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  scheduler:
+    type: "lambda"
+    gamma: 0.94
+    step_every: 2
+  loss: "cross_entropy"
+  label_smoothing: 0.1
+  epochs: 60
+  seeds: [0, 1, 2]
