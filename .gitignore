@@ -1,20 +1,40 @@
-# Ignore these files
+# Datasets and Local Caches
+data_sets/
+data/lung_masks
+node21/
+node21_view_test/
+*.npy
+
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.pyc
+.pytest_cache/
+
+# Virtual Environment
+torch_env/
+.venv/
+
+# MLflow and Tracking Databases
+mlflow.db
+mlruns/
+mlruns.db
+
+# Pretrained Weights and Checkpoints
+pretrained_models/
+*.pth
+*.pt
+*.pkl
+
+# Outputs & Logs
+outputs/checkpoints/
+outputs/logs/
 *.log
 *.png
-*.pyc
 
-# Ignore the Chest X-Ray Datasets
-data_sets/
-node21_view_test/
+/graphify-out
 
-# Ignore pretrained model weights
-/pretrained_models
-
-# Ignore torch_env setup
-torch_env/
-
-# Ignore __pychache__
-__pycache__
-
-#mlflow
-mlflow.db
+# poc testing
+poc
