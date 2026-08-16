@@ -12,6 +12,11 @@ class MLFlowTracker:
         mlflow.set_experiment(experiment_name)
         self.run = None
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end_run()
     
     def start_run(self, run_name: str, tags: Optional[Dict[str, str]] = None):
         """
@@ -44,19 +49,19 @@ class MLFlowTracker:
         for key, value in dictionary.items():
             new_key = f"{parent_key}{separator}{key}" if parent_key else key
 
-            if isinstance(value, dictionary):
-                items.extend(self._flatten_dictionary(value, new_key, separator=separator).items())
+            if isinstance(value, dict):
+                items.extend(self.flatten_dictionary(value, new_key, separator=separator).items())
             else:
                 items.append((new_key, value))
         
-        return dictionary
+        return dict(items)
     
     def log_metrics(self, metrics: Dict[str, float], step: int = None):
         """
         Log a batch of metrics, with an optonial step
         """
 
-        for key, value in metrics:
+        for key, value in metrics.items():
             mlflow.log_metric(key, value, step)
 
     

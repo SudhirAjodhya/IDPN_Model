@@ -37,6 +37,9 @@ outputs/*
 !outputs/**/.gitkeep
 *.log
 *.png
+*.json
+*.csv
+*.jpeg
 
 /graphify-out
 

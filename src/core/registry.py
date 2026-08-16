@@ -7,7 +7,7 @@ class Registry:
 
     def __init__(self, name: str):
         self._name = name
-        self._registry = Dict[str, Type] = {}
+        self._registry: Dict[str, Type] = {}
 
     
     def register(self, name: str) -> Callable:
@@ -16,7 +16,7 @@ class Registry:
         """
 
         def wrapper(class_object: Type) -> Type:
-            if not name in self._registry:
+            if name in self._registry:
                 raise ValueError(f"{name} already registered in {self._name}")
             
             self._registry[name] = class_object

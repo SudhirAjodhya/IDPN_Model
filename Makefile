@@ -17,11 +17,11 @@ setup:
 	$(PIP) install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
 test:
-	$(PYTHON) run_test.py
+	$(PYTHON) scripts/diagnostics/check_cuda.py
 
 # Usage: make run file=your_script.py
 run:
 	$(PYTHON) $(file)
 
 clean:
-rm - rf $(VENV)
+	rm -rf $(VENV)

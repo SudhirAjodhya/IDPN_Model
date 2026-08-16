@@ -1,13 +1,19 @@
-Matplotlib : torch_env/Scripts/python.exe -m pip install matplotlib 
-            or Activate the venv first:
-            torch_env/Scripts/activate
-            pip install matplotlib
+# Core Deep Learning & Vision
+torch>=2.0.0
+torchvision>=0.15.0
 
-OpenCV  : torch_env/Scripts/python.exe -m pip install opencv-python
-            or Activate the venv first:
-            torch_env/Scripts/activate
-            pip install opencv-python
-Pandas  : torch_env/Scripts/python.exe -m pip install pandas
-            or Activate the venv first:
-            torch_env/Scripts/activate
-            pip install pandas
+# Data Processing & Numerical Computing
+numpy>=1.24.0
+pandas>=2.0.0
+opencv-python>=4.8.0
+pyyaml>=6.0
+tqdm>=4.65.0
+pydicom>=2.4.0
+SimpleITK>=2.3.0
+
+# Experiment Tracking & Visualization
+mlflow>=2.5.0
+matplotlib>=3.7.0
+
+# Optional / Specific utilities
+# torchxrayvision  # Required only for generating offline lung masks (scripts/data/generate_lung_masks.py)
