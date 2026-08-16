@@ -1,6 +1,6 @@
 # Datasets and Local Caches
 data_sets/
-data/lung_masks
+data/lung_masks/
 node21/
 node21_view_test/
 *.npy
@@ -13,9 +13,12 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Virtual Environment
+# Virtual Environment and IDE
 torch_env/
 .venv/
+.idea/
+.DS_Store
+Thumbs.db
 
 # MLflow and Tracking Databases
 mlflow.db
@@ -28,9 +31,10 @@ pretrained_models/
 *.pt
 *.pkl
 
-# Outputs & Logs
-outputs/checkpoints/
-outputs/logs/
+# Outputs & Generated Experiment Artifacts
+outputs/*
+!outputs/results/
+!outputs/**/.gitkeep
 *.log
 *.png
 
