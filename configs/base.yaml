@@ -1,0 +1,64 @@
+# configs/base.yaml
+# Shared default configuration for all experiments.
+# Derived experiments can inherit from this using _base_: ../base.yaml and overriding only what's different.
+
+experiment:
+  name: "base_experiment"
+  direction: "maximize"
+  method_tag: "baseline"
+  notes: "Base configuration"
+
+data:
+  dataset: "jsrt"
+  input_size: 2048
+  target_size: 512
+  pixel_spacing_mm: 0.175
+  anatomy:
+    lung_y: [0.25, 0.75]
+    lung_x_left: [0.15, 0.45]
+    lung_x_right: [0.55, 0.85]
+    mediastinum_y: [0.25, 0.75]
+    mediastinum_x: [0.45, 0.55]
+
+model:
+  variant: "bilinear"
+  head: "centernet"
+  backbone: "convnext_tiny"
+  fpn_out: 256
+
+training:
+  epochs: 40
+  batch_size: 2
+  num_workers: 4
+  seed: 42
+  test_seed: 0
+  patience: 15
+  grad_accum: 1
+  mixed_precision: true
+  optimizer:
+    type: "adamw"
+    learning_rate: 1.0e-4
+    backbone_lr_factor: 0.1
+    weight_decay: 1.0e-4
+  scheduler:
+    type: "none"
+    eta_min: 1.0e-6
+
+loss:
+  type: "focal_v5"
+  alpha: 2.0
+  beta: 4.0
+  tv_weight: 1.0e-4
+  aux_mask_weight: 0.1
+  aux_density_high: 2.0
+  aux_density_low: 0.5
+
+evaluation:
+  score_threshold: 0.3
+  dist_threshold_mm: 15.0
+  heatmap_sigma_min: 2.5
+  froc: false
+
+logging:
+  mlflow_uri: "sqlite:///mlruns.db"
+  mlflow_experiment: "nodule_v7"
