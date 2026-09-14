@@ -28,13 +28,30 @@ class TalebiPaperResizer(nn.Module):
     matrix_v1 on JSRT+NODE21 mixed pipeline).
     """
 
-    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224):
+    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224,
+                 skip_mode="bilinear", skip_antialias=False):
         super().__init__()
 
         assert target_size in (224, 256, 384, 448, 512), \
             f"target_size {target_size} not tested"
 
+        assert skip_mode in ("bilinear", "bicubic"), \
+            "F.interpolate only implements antialias for bilinear and bicubic"
+
         self.target_size = target_size
+
+        # The GEOMETRIC SKIP only. The output is skip(x) + residual(x), so the skip is the
+        # classical downsampler this module is measured against - matching it to the
+        # baseline is what makes the difference between the two arms equal to the learned
+        # residual and nothing else. Comparing an anti-aliased baseline against a resizer
+        # whose skip still aliases would just reverse the unfairness.
+        #
+        # The FEATURE resize on line ~67 deliberately stays plain bilinear whatever this is
+        # set to: it lives inside residual(x), and Talebi and Milanfar Figure 3 specify
+        # bilinear there. Changing it would alter the published architecture rather than the
+        # comparison. Defaults reproduce the paper exactly, so every banked run is unaffected.
+        self.skip_mode = skip_mode
+        self.skip_antialias = skip_antialias
 
 
         # Entry block at original resoltuion
@@ -60,9 +77,13 @@ class TalebiPaperResizer(nn.Module):
     def forward(self, x):
 
         # x: (B, C, H, W) - Tensor as original resolution of the image
-        x_bilinear = F.interpolate(x, size=(self.target_size, self.target_size), mode='bilinear', align_corners=False)
+        x_bilinear = F.interpolate(x, size=(self.target_size, self.target_size),
+                                   mode=self.skip_mode, align_corners=False,
+                                   antialias=self.skip_antialias)
 
-        # Entry convolutions at original resolution
+        # Entry convolutions at original resolution. Plain bilinear on purpose - this resize
+        # is inside the learned residual and is what Figure 3 specifies; only the geometric
+        # skip above tracks the baseline.
         f = self.input_conv(x)
         f = F.interpolate(f, size=(self.target_size, self.target_size), mode="bilinear", align_corners=False)
 
@@ -90,12 +111,56 @@ class TalebiPaperResizerZeroInit(TalebiPaperResizer):
     starts strictly >= bilinear and can only improve. Same near-zero pattern that talebi_saliency + talebi_inverse_bone use after v6->v7's "pure zero
     kills upstream gradients" finding.
     """
-    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224):
-        super().__init__(in_channels=in_channels, n_filters=n_filters, n_blocks=n_blocks, target_size=target_size)
+    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224,
+                 skip_mode="bilinear", skip_antialias=False):
+        super().__init__(in_channels=in_channels, n_filters=n_filters, n_blocks=n_blocks,
+                         target_size=target_size, skip_mode=skip_mode,
+                         skip_antialias=skip_antialias)
 
         nn.init.kaiming_normal_(self.output_conv.weight, a=0.2)
         self.output_conv.weight.data *= 0.01
         nn.init.zeros_(self.output_conv.bias)
+
+
+@DOWNSAMPLER_REGISTRY.register("node21_talebi_zeroinit_aa")
+class TalebiPaperResizerZeroInitAntialias(TalebiPaperResizerZeroInit):
+    """
+    node21_talebi_zeroinit with an ANTI-ALIASED geometric skip. Pair this with the
+    `bilinear_antialias` baseline, never with `bilinear`.
+
+    The point: plain `bilinear` aliases hard at these decimation factors (9.1x at target
+    224), which is the very defect the learned residual is hypothesised to repair. Beating
+    it may therefore show only that anti-aliasing helps. This arm holds the classical base
+    at its best, so any remaining gap is attributable to LEARNING rather than filtering.
+
+    At init the residual is ~0, so this starts at anti-aliased bilinear and can only improve
+    on it - the same guarantee node21_talebi_zeroinit has against plain bilinear.
+    """
+
+    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224):
+        super().__init__(in_channels=in_channels, n_filters=n_filters, n_blocks=n_blocks,
+                         target_size=target_size, skip_mode="bilinear", skip_antialias=True)
+
+
+@DOWNSAMPLER_REGISTRY.register("node21_talebi_zeroinit_wide")
+class TalebiPaperResizerZeroInitWide(TalebiPaperResizerZeroInit):
+    """
+    Capacity ablation: same architecture and same near-zero output_conv init as
+    node21_talebi_zeroinit, with n_filters raised 16 -> 64.
+
+    DEVIATION FROM THE PAPER. Talebi & Milanfar Figure 3 specifies k7n16s1, so 16 is the
+    faithful width; 64 is ours and must be reported as an ablation, not as "Talebi".
+
+    Motivation: under val_sens selection the zeroinit resizer degrades monotonically as
+    input resolution rises at a fixed target (FROC AUC 0.883 at 224->224 down to 0.767 at
+    1024->224, five points, all same direction). Either 16 channels cannot carry the
+    information through a large downsample factor, or the limit is architectural. Widening
+    is the cheapest test that separates those. Params in the resizer go ~13.6k -> ~210k,
+    still negligible against the ~30.7M backbone.
+    """
+
+    def __init__(self, in_channels=1, n_filters=64, n_blocks=2, target_size=224):
+        super().__init__(in_channels=in_channels, n_filters=n_filters, n_blocks=n_blocks, target_size=target_size)
 
 
 # ==============================================================================
@@ -175,9 +240,11 @@ class _SwinLikeBlock(nn.Module):
 class TalebiPaperResizerZeroInitAttn(TalebiPaperResizer):
     """Paper-faithful zero-init Talebi + attention-subtraction branch. See block comment above."""
     def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224,
-                 attn_res=128, attn_window=8, attn_heads=2):
+                 attn_res=128, attn_window=8, attn_heads=2,
+                 skip_mode="bilinear", skip_antialias=False):
         super().__init__(in_channels=in_channels, n_filters=n_filters,
-                         n_blocks=n_blocks, target_size=target_size)
+                         n_blocks=n_blocks, target_size=target_size,
+                         skip_mode=skip_mode, skip_antialias=skip_antialias)
         # zero-init the residual (same as node21_talebi_zeroinit)
         nn.init.kaiming_normal_(self.output_conv.weight, a=0.2)
         self.output_conv.weight.data *= 0.01
@@ -189,8 +256,11 @@ class TalebiPaperResizerZeroInitAttn(TalebiPaperResizer):
         self.attention = _SwinLikeBlock(dim=n_filters, window_size=attn_window, num_heads=attn_heads)
 
     def forward(self, x):
-        # Paper-faithful path up through inner-skip, identical to base zeroinit
-        x_bilinear = F.interpolate(x, size=(self.target_size,) * 2, mode="bilinear", align_corners=False)
+        # Paper-faithful path up through inner-skip, identical to base zeroinit. The skip
+        # tracks the baseline (see TalebiPaperResizer.__init__); the feature resizes below
+        # stay plain bilinear because they live inside the learned residual.
+        x_bilinear = F.interpolate(x, size=(self.target_size,) * 2, mode=self.skip_mode,
+                                   align_corners=False, antialias=self.skip_antialias)
         f = self.input_conv(x)                                                # at native res
         f = F.interpolate(f, size=(self.target_size,) * 2, mode="bilinear", align_corners=False)
         f_skip = f
@@ -206,6 +276,23 @@ class TalebiPaperResizerZeroInitAttn(TalebiPaperResizer):
         # Subtract global from local, then zero-init residual projection
         residual = self.output_conv(f_conv - f_attn)
         return x_bilinear + residual
+
+
+@DOWNSAMPLER_REGISTRY.register("node21_talebi_zeroinit_attn_aa")
+class TalebiPaperResizerZeroInitAttnAntialias(TalebiPaperResizerZeroInitAttn):
+    """
+    node21_talebi_zeroinit_attn with an ANTI-ALIASED geometric skip.
+
+    Pair with `bilinear_antialias`, never with `bilinear`. Exists so the attention ablation
+    can be read against the same classical base as node21_talebi_zeroinit_aa - otherwise a
+    three-way comparison silently mixes two different baselines.
+    """
+
+    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224,
+                 attn_res=128, attn_window=8, attn_heads=2):
+        super().__init__(in_channels=in_channels, n_filters=n_filters, n_blocks=n_blocks,
+                         target_size=target_size, attn_res=attn_res, attn_window=attn_window,
+                         attn_heads=attn_heads, skip_mode="bilinear", skip_antialias=True)
 
 
 @DOWNSAMPLER_REGISTRY.register("talebi")

@@ -18,3 +18,4 @@ __all__ = [
     "InverseBoneTalebiResizer",
     "TalebiPaperResizer",
 ]
+from . import adaptive          # dilated / gated / warp resizers, 2026-08-21
