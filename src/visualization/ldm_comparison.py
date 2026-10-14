@@ -31,6 +31,11 @@ def save_ldm_comparison(model, test_loaders, output_dir, device, input_size=2048
     with torch.no_grad():
         with autocast(device_type=device.type, dtype=torch.bfloat16, enabled=device.type == "cuda"):
             hm_pred = model(img_sample)
+
+        # The box heads return a dict of branches; this panel visualises only the
+        # objectness map. centernet_det calls it "heatmap", fcos "classification".
+        if isinstance(hm_pred, dict):
+            hm_pred = hm_pred.get("heatmap", hm_pred.get("classification"))
         ldm_out = model.get_ldm_output(img_sample)
 
     bilinear_512 = F.interpolate(img_sample, (target_size, target_size),

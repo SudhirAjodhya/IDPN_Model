@@ -30,7 +30,7 @@ import torch
 import torch.nn.functional as F
 from scipy.ndimage import sobel
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent                     # scripts/diagnostics/ -> project root
 sys.path.insert(0, str(ROOT))
 
 from src.models.detector import NoduleDetector
@@ -46,9 +46,16 @@ INPUT_SIZE  = 2048
 TARGET_SIZE = 384
 
 CHECKPOINTS = [
-    ("outputs/v8/2026-08-13_improved_v1/node21_talebi_centernet_focal_v5_s42/best_model.pth",  "node21_talebi",  42),
-    ("outputs/v8/2026-08-13_improved_v1/node21_talebi_centernet_focal_v5_s7/best_model.pth",   "node21_talebi",   7),
-    ("outputs/v8/2026-08-14_improved_v1/node21_talebi_centernet_focal_v5_s123/best_model.pth", "node21_talebi", 123),
+    # Zero-init (small-kaiming * 0.01 on output_conv) - v2 recipe
+    ("outputs/v8/2026-08-15_v2_zeroinit/node21_talebi_zeroinit_centernet_focal_v5_s42/best_model.pth",    "node21_talebi_zeroinit",     42),
+    ("outputs/v8/2026-08-15_v2_zeroinit/node21_talebi_zeroinit_centernet_focal_v5_s7/best_model.pth",     "node21_talebi_zeroinit",      7),
+    ("outputs/v8/2026-08-15_v2_zeroinit/node21_talebi_zeroinit_centernet_focal_v5_s123/best_model.pth",   "node21_talebi_zeroinit",    123),
+    ("outputs/v8/2026-08-16_v2_zeroinit_and_attn/node21_talebi_zeroinit_centernet_focal_v5_s5/best_model.pth",   "node21_talebi_zeroinit",  5),
+    ("outputs/v8/2026-08-16_v2_zeroinit_and_attn/node21_talebi_zeroinit_centernet_focal_v5_s99/best_model.pth",  "node21_talebi_zeroinit", 99),
+    # Zero-init + attention-subtraction branch - v2 recipe
+    ("outputs/v8/2026-08-15_v2_zeroinit_and_attn/node21_talebi_zeroinit_attn_centernet_focal_v5_s42/best_model.pth",  "node21_talebi_zeroinit_attn",  42),
+    ("outputs/v8/2026-08-16_v2_zeroinit_and_attn/node21_talebi_zeroinit_attn_centernet_focal_v5_s7/best_model.pth",   "node21_talebi_zeroinit_attn",   7),
+    ("outputs/v8/2026-08-16_v2_zeroinit_and_attn/node21_talebi_zeroinit_attn_centernet_focal_v5_s123/best_model.pth", "node21_talebi_zeroinit_attn", 123),
 ]
 
 
@@ -159,7 +166,7 @@ def demo():
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--max-images", type=int, default=None)
-    p.add_argument("--out", type=str, default="outputs/talebi_residual_diagnostic.json")
+    p.add_argument("--out", type=str, default="outputs/results/talebi_residual_diagnostic.json")
     p.add_argument("--demo", action="store_true")
     args = p.parse_args()
 

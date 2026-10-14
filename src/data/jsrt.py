@@ -73,15 +73,24 @@ class JSRTDataset(Dataset):
         image_name = row["study_id"]
         xray_image = self._load(image_name)
 
+        # Resize to input_size if native (usually 2048) differs. Scale nodule coords by same factor
+        # so all downstream code (flip, rotation, model) sees coordinates in input_size space.
+        native_h, native_w = xray_image.shape
+        if native_h != self.input_size or native_w != self.input_size:
+            xray_image = cv2.resize(xray_image, (self.input_size, self.input_size),
+                                    interpolation=cv2.INTER_LINEAR)
+        scale_x = self.input_size / native_w
+        scale_y = self.input_size / native_h
+
         # Check if cxr has nodule, if not, then all metrics are initialized to 0
         has_nodule = row["state"] != "non-nodule" and not pd.isna(row["x"])
         cx, cy, radius_px, size_mm = 0.0, 0.0, 0.0, 0.0
 
         if has_nodule:
-            cx = float(row["x"])
-            cy = float(row["y"])
+            cx = float(row["x"]) * scale_x
+            cy = float(row["y"]) * scale_y
             size_mm = float(row["size"])
-            radius_px = size_mm / self.pixel_spacing_mm / 2.0
+            radius_px = (size_mm / self.pixel_spacing_mm / 2.0) * ((scale_x + scale_y) / 2.0)
 
         # If Augmentation is intended
         if self.augment:
@@ -101,10 +110,26 @@ class JSRTDataset(Dataset):
             if np.random.rand() < 0.3:
                 xray_image = np.clip(xray_image + np.random.randn(*xray_image.shape).astype(np.float32) * 0.01, 0.0, 1.0)
 
+        # JSRT annotates a centre and a diameter, not a box. Synthesise a square box of
+        # side 2*radius so the box-detection path has a target. This is an APPROXIMATION -
+        # JSRT boxes are not ground truth and any box metric on JSRT inherits that.
+        from src.data.node21 import MAX_OBJECTS
+
+        padded = np.zeros((MAX_OBJECTS, 4), dtype=np.float32)
+        num_boxes = 0
+
+        if has_nodule:
+            padded[0] = (cx, cy, 2.0 * radius_px, 2.0 * radius_px)
+            num_boxes = 1
+
         return torch.from_numpy(xray_image).unsqueeze(0), {
             "has_nodule": has_nodule,
             "center_2048": (cx, cy),
             "radius_px": radius_px,
             "size_mm": size_mm,
+            "boxes": torch.from_numpy(padded),          # (MAX_OBJECTS, 4) as cx, cy, w, h
+            "num_boxes": num_boxes,
+            "native_width": int(native_w),
+            "native_height": int(native_h),
             "filename": image_name,
         }

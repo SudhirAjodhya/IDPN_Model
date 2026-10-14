@@ -15,7 +15,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))    # scripts/eval/ -> scripts/ -> project root
 
 from src.data.splits import build_three_way_split
 from src.models.detector import NoduleDetector
@@ -24,7 +24,7 @@ from src.evaluation.size_stratified import (
 )
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-ROOT_DIR   = SCRIPT_DIR.parent
+ROOT_DIR   = SCRIPT_DIR.parent.parent                                     # scripts/eval/ -> project root
 DATA_DIR   = ROOT_DIR / "data_sets"
 
 DEFAULTS = {
@@ -47,6 +47,10 @@ def main() -> None:
     ap.add_argument("--seed",           type=int,  default=42)
     ap.add_argument("--batch-size",     type=int,  default=2)
     ap.add_argument("--input-size",     type=int,  default=2048)
+    ap.add_argument("--target-size",    type=int,  default=384,
+                    help="Must match training target_size or Talebi resizer will operate at the wrong scale.")
+    ap.add_argument("--backbone",       type=str,  default="convnext_fpn",
+                    choices=["convnext_fpn", "convnext_fpn_scratch", "resnet50_fpn", "resnet50_fpn_scratch"])
     ap.add_argument("--out",            type=Path, default=None,
                     help="JSON output path (default: sibling of checkpoint)")
     args = ap.parse_args()
@@ -66,7 +70,8 @@ def main() -> None:
     test_dl = DataLoader(test_loaders["node21"], batch_size=args.batch_size,
                          shuffle=False, num_workers=2)
 
-    model = NoduleDetector(variant=args.variant, head=args.head).to(device)
+    model = NoduleDetector(variant=args.variant, head=args.head,
+                           target_size=args.target_size, backbone=args.backbone).to(device)
     model.load_state_dict(torch.load(args.checkpoint, map_location=device))
 
     bin_lookup = _load_bin_lookup(str(args.stratification))

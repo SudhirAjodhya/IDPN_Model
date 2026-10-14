@@ -29,21 +29,14 @@ from src.utils.results_aggregation_talebi_reproduce import summarize
 
 
 def parse_args():
-    p = argparse.ArgumentParser(
-        description="Talebi & Milanfar (ICCV 2021) paper reproduction on ImageNette"
-    )
-    p.add_argument("--phase", choices=["A", "B"],
-                   help="Training phase: A (bilinear baseline) or B (Talebi resizer)")
-    p.add_argument("--seed", type=int, default=0,
-                   help="Random seed (default: 0)")
-    p.add_argument("--epochs", type=int, default=60,
-                   help="Number of training epochs (default: 60)")
-    p.add_argument("--data-root", type=str, default=str(DATA_ROOT),
-                   help="Path to ImageNette dataset root")
-    p.add_argument("--smoke", action="store_true",
-                   help="Quick end-to-end sanity: Phase A (2 ep) then Phase B (2 ep)")
-    p.add_argument("--summarize", action="store_true",
-                   help="Aggregate all phase*_seed*.json into SUMMARY.md")
+    p = argparse.ArgumentParser(description="Talebi & Milanfar (ICCV 2021) paper reproduction on ImageNette")
+    p.add_argument("--phase", choices=["A", "B"], help="Training phase: A (bilinear baseline) or B (Talebi resizer)")
+    p.add_argument("--seed", type=int, default=0, help="Random seed (default: 0)")
+    p.add_argument("--epochs", type=int, default=60, help="Number of training epochs (default: 60)")
+    p.add_argument("--data-root", type=str, default=str(DATA_ROOT), help="Path to ImageNette dataset root")
+    p.add_argument("--smoke", action="store_true", help="Quick end-to-end sanity: Phase A (2 ep) then Phase B (2 ep)")
+    p.add_argument("--summarize", action="store_true", help="Aggregate all phase*_seed*.json into SUMMARY.md")
+
     return p.parse_args()
 
 
@@ -52,10 +45,12 @@ def main():
 
     if args.summarize:
         summarize()
+
         return
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"device: {device}")
+
     if device.type == "cuda":
         torch.backends.cudnn.benchmark = True
         print(f"cuda: {torch.cuda.get_device_name(0)}  "

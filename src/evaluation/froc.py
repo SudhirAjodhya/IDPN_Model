@@ -19,7 +19,15 @@ def compute_froc_data_v5(model, loader, device, thresholds=None, dist_thresh_mm=
     for images, targets in loader:
         images = images.to(device)
         with autocast(enabled=device.type == "cuda"):
-            preds = torch.sigmoid(model(images)).cpu()
+            output = model(images)
+
+            # Centre-distance FROC only reads the heatmap branch. For centernet_det the
+            # box FROC in node21_detection_metrics is the metric that should be reported;
+            # this path stays available so both can be compared on the same checkpoint.
+            if isinstance(output, dict):
+                output = output.get("heatmap", output.get("classification"))
+
+            preds = torch.sigmoid(output).cpu()
 
         for i in range(preds.shape[0]):
             pred_hm    = preds[i, 0]
