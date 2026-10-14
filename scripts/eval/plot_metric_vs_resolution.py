@@ -157,12 +157,22 @@ def load(run_group, recipe_filter):
 
 
 def main():
+    # Module-level so every figure-writing helper below picks it up without
+    # threading the path through each signature
+    global OUT_DIR
+
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--run-group", default=None,
                         help="substring, or several comma-separated, on run_group")
     parser.add_argument("--recipe", default=None)
+    parser.add_argument("--out-dir", default=str(OUT_DIR),
+                        help="Directory for the figures. Point this somewhere separate when "
+                             "regenerating an old result set, so the new files cannot be "
+                             "confused with the current ones.")
     arguments = parser.parse_args()
+
+    OUT_DIR = Path(arguments.out_dir)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     runs = load(arguments.run_group, arguments.recipe)

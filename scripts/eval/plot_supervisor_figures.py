@@ -1,4 +1,4 @@
-"""
+﻿"""
 Figures for the supervisor meeting: bilinear vs the Talebi family.
 
 Deliberately restricted to bilinear, node21_talebi_zeroinit and node21_talebi_zeroinit_attn.
@@ -97,7 +97,7 @@ def sensitivity_at_budget(curve, budget=BUDGET):
     return float(np.interp(budget, fp[order], se[order], left=0.0, right=se[order][-1]))
 
 
-def load(head, recipe="", run_group=None, exclude_run_group=None):
+def load(head, recipe="", run_group=None, exclude_run_group=None, input_size=1024):
     """
     (variant, target) -> {seed: {...}} for one head, squash runs only, at input 1024.
 
@@ -121,7 +121,9 @@ def load(head, recipe="", run_group=None, exclude_run_group=None):
             continue
 
         if run.get("head") != head or run.get("letterbox"): continue
-        if run.get("input_size") != 1024: continue
+        # Input resolution became an experimental axis on 2026-09-18. Hardcoding it to 1024
+        # silently dropped every run at any other input - the caller now chooses.
+        if run.get("input_size") != input_size: continue
         if run.get("variant") not in COLOURS: continue
 
         box_metrics = (run.get("box_metrics") or {}).get("iou0.25")
@@ -167,15 +169,20 @@ def summarise(entry):
 
 def figure_resolution_sweep(runs, plt, tag=""):
     """Headline: does the learned resizer beat bilinear, and what actually moves the needle."""
+    # Derived from what is actually present. The allowlist that used to sit here stopped
+    # at 512 and silently dropped the 768 and 1024 cells from the headline figure - the
+    # same failure the --variant and --target allowlists caused elsewhere.
+    #
     # Only targets where BOTH arms exist, so every group is a paired comparison
-    targets = [t for t in (224, 256, 384, 512)
-               if ("bilinear", t) in runs and ("node21_talebi_zeroinit", t) in runs]
+    targets = sorted(target for (variant, target) in runs
+                     if variant == "bilinear" and ("node21_talebi_zeroinit", target) in runs)
 
     variants = ["bilinear", "node21_talebi_zeroinit"]
-    figure, axes = plt.subplots(figsize=(9.0, 5.8))
+    figure, axes = plt.subplots(figsize=(11.0, 5.8))
     width = 0.36
     positions = np.arange(len(targets))
     tops = {}
+    highest_cap = 0.0
 
     for offset, variant in zip((-width / 2, width / 2), variants):
         means, caps, counts = [], [], []
@@ -188,6 +195,7 @@ def figure_resolution_sweep(runs, plt, tag=""):
             upper.append(stat["high"] - stat["mean"])
             caps.append(stat["high"])
             counts.append(stat["n"])
+            highest_cap = max(highest_cap, stat["high"])
             tops[(variant, target)] = (positions[index] + offset, stat["mean"])
 
         bars = axes.bar(positions + offset, means, width, label=LABELS[variant],
@@ -210,7 +218,8 @@ def figure_resolution_sweep(runs, plt, tag=""):
     # plots every metric against resolution with the seed count visible per point.
 
     axes.set(xticks=positions, xlabel="Backbone input resolution (target size)",
-             ylabel="Sensitivity at {} FP / image".format(BUDGET), ylim=(0, 0.68))
+             ylabel="Sensitivity at {} FP / image".format(BUDGET),
+             ylim=(0, highest_cap * 1.18))
     axes.set_xticklabels(["{}x{}".format(t, t) for t in targets])
     axes.set_title("NODE21 nodule detection at a matched false-positive budget\n"
                    "ConvNeXt-T + FPN, FCOS head, 147 test nodules", fontsize=11.5)
@@ -384,7 +393,8 @@ def figure_family(runs, plt, tag=""):
     return path
 
 
-def figure_froc_grid(plt, recipe="", run_group=None, exclude_run_group=None, tag=""):
+def figure_froc_grid(plt, recipe="", run_group=None, exclude_run_group=None, tag="",
+                     input_size=1024):
     """
     Full FROC curves, one panel per target resolution.
 
@@ -404,7 +414,7 @@ def figure_froc_grid(plt, recipe="", run_group=None, exclude_run_group=None, tag
             continue
 
         if run.get("head") != "fcos" or run.get("letterbox"): continue
-        if run.get("input_size") != 1024 or run.get("variant") not in COLOURS: continue
+        if run.get("input_size") != input_size or run.get("variant") not in COLOURS: continue
 
         box_metrics = (run.get("box_metrics") or {}).get("iou0.25")
 
@@ -583,6 +593,10 @@ def print_setup_summary(runs, targets):
 
 
 def main():
+    # Module-level so every figure-writing helper below picks it up without
+    # threading the path through each signature
+    global OUT_DIR
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--recipe", type=str, default="",
                         help="Recipe tag to plot. Default "" is the canonical NODE21-only "
@@ -595,7 +609,16 @@ def main():
                         help="Substring of run_group to EXCLUDE, e.g. v14 to keep only "
                              "pre-INTER_AREA-fix runs. The resolution sweep spans v9/v11/v12 "
                              "so --run-group alone cannot express it.")
+    parser.add_argument("--input-size", type=int, default=1024,
+                        help="Resizer INPUT resolution. Runs at different inputs face "
+                             "different decimation ratios and are never merged.")
+    parser.add_argument("--out-dir", default=str(OUT_DIR),
+                        help="Directory for the figures. Point this somewhere separate when "
+                             "regenerating an old result set, so the new files cannot be "
+                             "confused with the current ones.")
     arguments = parser.parse_args()
+
+    OUT_DIR = Path(arguments.out_dir)
 
     tag = ""
 
@@ -610,13 +633,18 @@ def main():
     if arguments.exclude_run_group:
         tag += "_no" + arguments.exclude_run_group
 
+    # Input belongs in the filename or an input sweep overwrites the 1024 figures
+    if arguments.input_size != 1024:
+        tag += "_i{}".format(arguments.input_size)
+
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     runs = load("fcos", recipe=arguments.recipe, run_group=arguments.run_group,
-                exclude_run_group=arguments.exclude_run_group)
+                exclude_run_group=arguments.exclude_run_group,
+                input_size=arguments.input_size)
     print("recipe: '{}'{}".format(arguments.recipe,
           "  run_group~" + arguments.run_group if arguments.run_group else ""))
 
@@ -634,7 +662,8 @@ def main():
     print("wrote {}".format(path3) if path3 else "skipped fig3 (family incomplete at t384)")
 
     path4 = figure_froc_grid(plt, recipe=arguments.recipe, run_group=arguments.run_group,
-                             exclude_run_group=arguments.exclude_run_group, tag=tag)
+                             exclude_run_group=arguments.exclude_run_group, tag=tag,
+                             input_size=arguments.input_size)
     print("wrote {}".format(path4) if path4 else "skipped fig4 (no froc curves)")
 
     print_setup_summary(runs, targets)
@@ -665,3 +694,4 @@ if __name__ == "__main__":
         _demo()
     else:
         main()
+

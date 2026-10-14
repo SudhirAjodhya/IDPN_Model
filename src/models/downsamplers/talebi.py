@@ -32,8 +32,17 @@ class TalebiPaperResizer(nn.Module):
                  skip_mode="bilinear", skip_antialias=False):
         super().__init__()
 
-        assert target_size in (224, 256, 384, 448, 512), \
-            f"target_size {target_size} not tested"
+        # An allowlist of (224, 256, 384, 448, 512) used to sit here. It was a guard against
+        # untested sizes, but nothing in this module depends on the target beyond the two
+        # F.interpolate calls, so it was blocking a legitimate experiment rather than
+        # catching a bug - the resolution sweep needs 768 and 1024 to find where the
+        # returns from output resolution stop.
+        #
+        # What IS load-bearing is divisibility by the head stride: FCOS predicts on a
+        # target/4 grid, so a target that is not a multiple of 4 silently changes the
+        # rounding between box coordinates and grid cells.
+        assert target_size >= 64 and target_size % 4 == 0, \
+            f"target_size {target_size} must be >= 64 and divisible by the stride-4 head grid"
 
         assert skip_mode in ("bilinear", "bicubic"), \
             "F.interpolate only implements antialias for bilinear and bicubic"

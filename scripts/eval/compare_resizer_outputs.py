@@ -260,6 +260,7 @@ def main() -> None:
     parser.add_argument("--n-films", type=int, default=5)
     parser.add_argument("--out", type=Path, default=Path("outputs/results"))
     parser.add_argument("--seed", type=int, default=0, help="control-box placement seed")
+    parser.add_argument("--films", nargs="*", default=None, help="film stems to show (e.g. n0306); default is the first nodule-bearing test films")
     arguments = parser.parse_args()
 
     arguments.out.mkdir(parents=True, exist_ok=True)
@@ -286,6 +287,9 @@ def main() -> None:
 
     for images, targets in loader:
         if int(targets["num_boxes"][0]) == 0:
+            continue
+
+        if arguments.films and Path(targets["filename"][0]).stem not in arguments.films:
             continue
 
         out_a = resizer_output(model_a, images, device)
@@ -331,7 +335,7 @@ def main() -> None:
             "nodule_diff": nodule_diff, "control_diff": control_diff, "crop": crop,
         })
 
-        if len(records) >= arguments.n_films:
+        if len(records) >= (len(arguments.films) if arguments.films else arguments.n_films):
             break
 
     if not records:

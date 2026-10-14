@@ -52,6 +52,31 @@ MAX_OBJECTS = 16
 # Rows whose class marks the absence of any finding. The film is kept, the row is not.
 NO_FINDING_CLASS = "No finding"
 
+# The 14 abnormality classes, in a FIXED order. A class id must mean the same thing in
+# every run, every checkpoint and every figure, so this list is sorted and frozen rather
+# than derived from whatever order the CSV happens to be read in. Counts are films, from
+# train.csv, and they are wildly imbalanced - Pneumothorax has 96 films against Aortic
+# enlargement's 3,067, so any per-class number on the tail classes is indicative only.
+VINDR_CLASSES = (
+    "Aortic enlargement",      # 3067 films
+    "Atelectasis",             #  186
+    "Calcification",           #  452
+    "Cardiomegaly",            # 2300
+    "Consolidation",           #  353
+    "ILD",                     #  386
+    "Infiltration",            #  613
+    "Lung Opacity",            # 1322
+    "Nodule/Mass",             #  826
+    "Other lesion",            # 1134
+    "Pleural effusion",        # 1032
+    "Pleural thickening",      # 1981
+    "Pneumothorax",            #   96
+    "Pulmonary fibrosis",      # 1617
+)
+
+CLASS_TO_INDEX = {name: index for index, name in enumerate(VINDR_CLASSES)}
+NUM_VINDR_CLASSES = len(VINDR_CLASSES)
+
 
 def load_dicom_pixels(dicom_path) -> tuple[np.ndarray, dict]:
     """
@@ -137,7 +162,13 @@ def fuse_reader_boxes(boxes: list, iou_threshold: float = 0.4) -> np.ndarray:
 
     Greedy largest-first clustering: each box either joins the first existing cluster it
     overlaps beyond the threshold, or seeds a new one. Each cluster is then averaged.
-    Class-agnostic, because every class is generic foreground for this project.
+
+    CLASS-AGNOSTIC, and callers that care about class must not use it directly. Two
+    different findings on one film routinely overlap - a cardiomegaly box and an aortic
+    enlargement box sit on top of each other by anatomy - so fusing across classes would
+    merge distinct lesions into one and silently lose a label. `fuse_reader_boxes_by_class`
+    below is the class-aware entry point; this one is kept for the single-class pooled
+    training path, whose behaviour must not move.
 
     Args:
         boxes: list of (x_min, y_min, x_max, y_max) in native pixel coordinates
@@ -166,6 +197,40 @@ def fuse_reader_boxes(boxes: list, iou_threshold: float = 0.4) -> np.ndarray:
     return np.array([np.mean(members, axis=0) for _, members in clusters], dtype=np.float32)
 
 
+def fuse_reader_boxes_by_class(boxes_with_class: list, iou_threshold: float = 0.4):
+    """
+    Fuse multi-reader boxes WITHIN each class, never across classes.
+
+    Three radiologists marking one lesion agree on its class, so the duplication this
+    removes is always within-class. Fusing across classes would collapse anatomically
+    overlapping findings - cardiomegaly and aortic enlargement being the obvious pair -
+    into a single box and lose one of the two labels.
+
+    Args:
+        boxes_with_class: list of (x_min, y_min, x_max, y_max, class_index)
+        iou_threshold: overlap above which two boxes are the same lesion
+
+    Returns:
+        (boxes, classes) - (N, 4) float32 and (N,) int64, aligned row for row.
+    """
+    by_class = defaultdict(list)
+
+    for x_min, y_min, x_max, y_max, class_index in boxes_with_class:
+        by_class[int(class_index)].append([x_min, y_min, x_max, y_max])
+
+    fused_boxes, fused_classes = [], []
+
+    for class_index in sorted(by_class):
+        for box in fuse_reader_boxes(by_class[class_index], iou_threshold):
+            fused_boxes.append(box)
+            fused_classes.append(class_index)
+
+    if not fused_boxes:
+        return np.zeros((0, 4), dtype=np.float32), np.zeros((0,), dtype=np.int64)
+
+    return np.array(fused_boxes, dtype=np.float32), np.array(fused_classes, dtype=np.int64)
+
+
 class VinDrDataset(Dataset):
     """
     VinDr-CXR films with every pathology box treated as one generic foreground class.
@@ -182,7 +247,7 @@ class VinDrDataset(Dataset):
     def __init__(self, annotations_csv, images_root, image_ids=None, augment=False,
                  input_size=2048, clahe=True, aug_profile="v3", letterbox=False,
                  iou_threshold=0.4, include_negatives=True, negative_ratio=None,
-                 subsample_seed=0, cache_dir=None, dicom_root=None):
+                 subsample_seed=0, cache_dir=None, dicom_root=None, multiclass=False):
         """
         Args:
             annotations_csv: path to VinDr train.csv
@@ -194,6 +259,9 @@ class VinDrDataset(Dataset):
             aug_profile: key into the shared AUGMENTATION_PROFILES table
             letterbox: preserve aspect and pad, instead of squashing to square
             iou_threshold: overlap at which two readers' boxes are treated as one lesion
+            multiclass: keep the 14 VinDr class labels instead of collapsing every box to
+                one generic foreground class. Defaults False so every pooled
+                NODE21+VinDr run behaves exactly as it did before this flag existed.
             include_negatives: keep "No finding" films as background-only samples
             negative_ratio: keep only this many negatives per positive film. None keeps
                 every negative. 10,606 of VinDr's 15,000 films carry NO boxes, so they
@@ -237,6 +305,8 @@ class VinDrDataset(Dataset):
                 for row in csv.DictReader(handle):
                     self.native_dims[row["image_id"]] = (int(row["rows"]), int(row["cols"]))
 
+        self.multiclass = multiclass
+
         # Gather every annotated box per film, dropping the "No finding" marker rows but
         # remembering that the film existed so it can be kept as a negative.
         boxes_by_image = defaultdict(list)
@@ -250,8 +320,11 @@ class VinDrDataset(Dataset):
                 if row["class_name"] == NO_FINDING_CLASS or row["x_min"] == "":
                     continue
 
+                # The class index rides along as a 5th element. The single-class path
+                # slices it off below, so its records are unchanged.
                 boxes_by_image[image_id].append([float(row["x_min"]), float(row["y_min"]),
-                                                 float(row["x_max"]), float(row["y_max"])])
+                                                 float(row["x_max"]), float(row["y_max"]),
+                                                 CLASS_TO_INDEX[row["class_name"]]])
 
         wanted = set(image_ids) if image_ids is not None else seen_image_ids
 
@@ -263,12 +336,20 @@ class VinDrDataset(Dataset):
             if image_id not in seen_image_ids:
                 continue
 
-            fused = fuse_reader_boxes(boxes_by_image.get(image_id, []), iou_threshold)
+            raw = boxes_by_image.get(image_id, [])
+
+            if self.multiclass:
+                fused, classes = fuse_reader_boxes_by_class(raw, iou_threshold)
+            else:
+                # Drop the class column and fuse exactly as before - this branch feeds the
+                # pooled NODE21+VinDr runs and must stay byte-identical to them.
+                fused = fuse_reader_boxes([box[:4] for box in raw], iou_threshold)
+                classes = np.zeros((len(fused),), dtype=np.int64)
 
             if len(fused) == 0 and not include_negatives:
                 continue
 
-            self.records.append((image_id, fused))
+            self.records.append((image_id, fused, classes))
 
         # Drop surplus negatives. Every box lives on a positive film, so this keeps 100%
         # of the supervision. Sorted-then-seeded so the kept subset is identical across
@@ -299,8 +380,8 @@ class VinDrDataset(Dataset):
                   f"Loading uncached at roughly 300 ms/film.")
             self.cache_dir = None
 
-        positive_films = sum(1 for _, boxes in self.records if len(boxes))
-        total_boxes = sum(len(boxes) for _, boxes in self.records)
+        positive_films = sum(1 for _, boxes, _ in self.records if len(boxes))
+        total_boxes = sum(len(boxes) for _, boxes, _ in self.records)
 
         if self.cache_dir is None:
             cache_note = "[cache disabled]"
@@ -422,7 +503,7 @@ class VinDrDataset(Dataset):
         return image_input, (native_h, native_w)
 
     def __getitem__(self, idx):
-        image_id, boxes_native = self.records[idx]
+        image_id, boxes_native, box_classes = self.records[idx]
 
         image_input, (native_h, native_w) = self._load_input(image_id)
 
@@ -462,6 +543,18 @@ class VinDrDataset(Dataset):
         num_boxes = min(len(boxes_input), MAX_OBJECTS)
         padded[:num_boxes] = boxes_input[:num_boxes]
 
+        # Class ids, padded the same way. Padded slots read 0, which is a REAL class id,
+        # so num_boxes is the only thing that says which rows are meaningful - exactly as
+        # it already is for the box coordinates themselves.
+        padded_classes = np.zeros((MAX_OBJECTS,), dtype=np.int64)
+        padded_classes[:num_boxes] = box_classes[:num_boxes]
+
+        # Image-level multi-label vector, which is what the VinDr sweep actually scores
+        # against. Derived here rather than downstream so augmentation that drops a box
+        # cannot desynchronise it from the boxes.
+        image_labels = np.zeros((NUM_VINDR_CLASSES,), dtype=np.float32)
+        image_labels[box_classes[:num_boxes]] = 1.0
+
         first_cx, first_cy, first_w, first_h = (padded[0] if num_boxes else (0.0, 0.0, 0.0, 0.0))
 
         target = {
@@ -469,6 +562,8 @@ class VinDrDataset(Dataset):
             "center_2048": (float(first_cx), float(first_cy)),
             "radius_px": float(max(first_w, first_h) / 2.0),
             "boxes": torch.from_numpy(padded),          # (MAX_OBJECTS, 4) as cx, cy, w, h
+            "box_classes": torch.from_numpy(padded_classes),   # (MAX_OBJECTS,) int64
+            "image_labels": torch.from_numpy(image_labels),    # (14,) multi-hot
             "num_boxes": num_boxes,
             "native_width": int(native_w),
             "native_height": int(native_h),
@@ -492,6 +587,33 @@ def _demo() -> None:
 
     # Non-overlapping boxes must never fuse regardless of ordering.
     assert len(fuse_reader_boxes([[0, 0, 10, 10], [50, 50, 60, 60]])) == 2
+
+    # CLASS-AWARE FUSION. The failure this guards against is anatomical: cardiomegaly and
+    # aortic enlargement overlap heavily on a real film, and the class-agnostic path
+    # merges them into one box, losing a label. Same geometry, two classes:
+    overlapping_two_classes = [
+        [100, 100, 200, 200, CLASS_TO_INDEX["Cardiomegaly"]],
+        [102, 98, 198, 204, CLASS_TO_INDEX["Aortic enlargement"]],
+    ]
+    boxes, classes = fuse_reader_boxes_by_class(overlapping_two_classes)
+    assert len(boxes) == 2, f"different classes must never fuse, got {len(boxes)} boxes"
+    assert set(classes.tolist()) == {CLASS_TO_INDEX["Cardiomegaly"],
+                                     CLASS_TO_INDEX["Aortic enlargement"]}
+    assert len(fuse_reader_boxes([box[:4] for box in overlapping_two_classes])) == 1,         "the class-agnostic path is supposed to merge these - that is why it cannot be used"
+    print("OK  two classes on overlapping boxes stay separate (class-agnostic gives 1)")
+
+    # Within one class, three readers still collapse to one lesion
+    three_readers_one_class = [box + [CLASS_TO_INDEX["Nodule/Mass"]]
+                               for box in one_lesion_three_readers]
+    boxes, classes = fuse_reader_boxes_by_class(three_readers_one_class)
+    assert len(boxes) == 1 and classes.tolist() == [CLASS_TO_INDEX["Nodule/Mass"]]
+    print("OK  three readers on one lesion still fuse to 1, class preserved")
+
+    # The class vocabulary is frozen: an id must mean the same thing in every run
+    assert len(VINDR_CLASSES) == 14 and len(CLASS_TO_INDEX) == 14
+    assert VINDR_CLASSES[0] == "Aortic enlargement" and VINDR_CLASSES[-1] == "Pulmonary fibrosis"
+    assert list(VINDR_CLASSES) == sorted(VINDR_CLASSES),         "VINDR_CLASSES must stay sorted or saved class ids stop matching new runs"
+    print("OK  14 classes, frozen order")
 
     # IoU sanity: identical boxes are 1.0, disjoint are 0.0.
     assert abs(box_iou([0, 0, 10, 10], [0, 0, 10, 10]) - 1.0) < 1e-6

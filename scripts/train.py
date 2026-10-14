@@ -220,7 +220,15 @@ def main():
     # Resolution tag: only appended when input!=2048 or target!=512 (defaults). Keeps legacy
     # naming for v1/v2 runs, prevents collisions in v3 resolution sweep where multiple runs
     # share (variant, seed, backbone) but differ in input/target size.
-    _res_tag = "" if (args.input_size == 2048 and args.target_size == 512) else f"_i{args.input_size}_t{args.target_size}"
+    # ALWAYS tag the resolution. This used to be suppressed at input 2048 / target 512
+    # because those were the v1/v2 defaults, which meant a run at exactly that pair got a
+    # name with no resolution in it. That bit on 2026-09-19: the v17 input sweep produced
+    # `bilinear_fcos_focal_v5_s42_vindr_vnr1` for its i2048/t512 cell, so -Resume could not
+    # find it and would have retrained it, and every name-based glob missed it. metrics.json
+    # was correct throughout, so the damage was confined to tooling that reads paths.
+    #
+    # Legacy runs keep whatever name they already have on disk; this only affects new runs.
+    _res_tag = f"_i{args.input_size}_t{args.target_size}"
 
     # Recipe tag: any knob that changes the run but is not otherwise in the path. Without
     # it, two runs differing only by --freeze-backbone-epochs (or --aug-profile, or

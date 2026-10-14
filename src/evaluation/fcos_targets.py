@@ -31,7 +31,8 @@ def _cell_centres(heatmap_size, device):
     return torch.stack([grid_x.reshape(-1), grid_y.reshape(-1)], dim=1)
 
 
-def make_fcos_targets(targets, batch_size, heatmap_size, input_size, device, max_objects=4):
+def make_fcos_targets(targets, batch_size, heatmap_size, input_size, device, max_objects=4,
+                      num_classes=1):
     """
     Assign every cell to a ground-truth box or to background.
 
@@ -44,10 +45,13 @@ def make_fcos_targets(targets, batch_size, heatmap_size, input_size, device, max
                  input_size space and "num_boxes" (B,)
         heatmap_size: side of the square prediction grid
         input_size: side of the model input, for the input->heatmap scale
+        num_classes: 1 for the NODE21 single-class track, 14 for the VinDr multi-class
+                 sweep. At num_classes=1 every tensor below is shaped exactly as it was
+                 before this argument existed, so no banked run changes.
 
     Returns:
         dict with
-          classification (B, 1, H, W)  1.0 at positive cells
+          classification (B, C, H, W)  1.0 at a positive cell, in ITS BOX'S class channel
           ltrb           (B, 4, H, W)  distances to left/top/right/bottom edges, in cells
           centerness     (B, 1, H, W)  sqrt of the l/r and t/b balance, 0 at negatives
           positive_mask  (B, 1, H, W)  1.0 where a box was assigned
@@ -56,12 +60,15 @@ def make_fcos_targets(targets, batch_size, heatmap_size, input_size, device, max
     centres = _cell_centres(heatmap_size, device)                     # (N, 2)
     n_cells = centres.shape[0]
 
-    classification = torch.zeros((batch_size, 1, heatmap_size, heatmap_size), device=device)
+    classification = torch.zeros((batch_size, num_classes, heatmap_size, heatmap_size), device=device)
     ltrb           = torch.zeros((batch_size, 4, heatmap_size, heatmap_size), device=device)
     centerness     = torch.zeros((batch_size, 1, heatmap_size, heatmap_size), device=device)
     positive_mask  = torch.zeros((batch_size, 1, heatmap_size, heatmap_size), device=device)
 
     boxes_batch, counts = targets["boxes"], targets["num_boxes"]
+
+    # Absent for the single-class track, where every box is generic foreground.
+    classes_batch = targets.get("box_classes")
 
     for i in range(batch_size):
         n_objects = min(int(counts[i]), max_objects)
@@ -102,8 +109,23 @@ def make_fcos_targets(targets, batch_size, heatmap_size, input_size, device, max
         cell_centerness = balance.clamp(min=0).sqrt()
 
         grid = lambda flat: flat.view(heatmap_size, heatmap_size)
-        positive_mask[i, 0]  = grid(is_positive.float())
-        classification[i, 0] = grid(is_positive.float())
+        positive_mask[i, 0] = grid(is_positive.float())
+
+        if num_classes == 1:
+            classification[i, 0] = grid(is_positive.float())
+
+        else:
+            # A positive cell fires in the channel of the box it was assigned to, which
+            # is the SMALLEST box covering it - the same ambiguity rule used above, so a
+            # cell never claims two classes. Overlapping findings of different classes
+            # (cardiomegaly over aortic enlargement is the common pair) are therefore
+            # resolved to the smaller lesion rather than being double-counted.
+            box_classes = classes_batch[i, :n_objects].long().to(device)
+            cell_class = box_classes[chosen]                                   # (N,)
+
+            for class_index in torch.unique(cell_class[is_positive]):
+                fires = is_positive & (cell_class == class_index)
+                classification[i, int(class_index)] = grid(fires.float())
         centerness[i, 0]     = grid(torch.where(is_positive, cell_centerness, torch.zeros_like(cell_centerness)))
 
         for c in range(4):
@@ -249,6 +271,35 @@ def _demo():
     matched = box_iou(truth, out_boxes[0][out_scores[0] > 0])
     assert matched.max(dim=1).values.min() > 0.9, f"decode+NMS IoU {matched.max(dim=1).values}"
     print(f"OK  decode + NMS recovers both boxes ({int((out_scores[0] > 0).sum())} detections kept)")
+
+    # ---- multi-class assignment, for the VinDr sweep ----
+    # Two well-separated boxes of different classes must fire in their own channels and
+    # nowhere else. The failure this catches is a cell claiming more than one class, which
+    # would make the per-class scores meaningless while every total still looked right.
+    multi = {"boxes": boxes.clone(), "num_boxes": counts.clone(),
+             "box_classes": torch.zeros((2, 4), dtype=torch.long)}
+    multi["box_classes"][0, 0] = 3        # first box  -> class 3
+    multi["box_classes"][0, 1] = 11       # second box -> class 11
+
+    m = make_fcos_targets(multi, 2, heatmap_size, input_size, "cpu", num_classes=14)
+
+    assert m["classification"].shape == (2, 14, heatmap_size, heatmap_size)
+
+    fired = [c for c in range(14) if m["classification"][0, c].sum() > 0]
+    assert fired == [3, 11], f"expected classes 3 and 11 to fire, got {fired}"
+
+    # No cell may be positive in two channels at once
+    per_cell = m["classification"][0].sum(dim=0)
+    assert per_cell.max() <= 1.0, f"a cell claimed {per_cell.max():.0f} classes"
+
+    # Total positives must match the single-class run exactly - only the channel moved
+    assert int(m["positive_mask"][0].sum()) == n_pos_img0,         "multi-class assignment changed WHICH cells are positive, not just their channel"
+    print("OK  multi-class: boxes fire in channels 3 and 11, no cell claims two classes")
+
+    # Class ids must survive into the loss unchanged in count
+    assert abs(float(m["classification"].sum()) - float(t["classification"].sum())) < 1e-6
+    print("OK  multi-class positive count identical to single-class ({:.0f} cells)".format(
+        float(m["classification"].sum())))
 
 
 if __name__ == "__main__":

@@ -130,7 +130,7 @@ def build_three_way_split(jsrt_csv_path, jsrt_image_dir, node21_csv_path, node21
             split_info["train"] = len(train_ds)
             split_info["train_node21"] = len(n21_train_tagged)
             split_info["train_vindr"] = len(vindr_train_tagged)
-            split_info["vindr_boxes"] = sum(len(boxes) for _, boxes in vindr_train.records)
+            split_info["vindr_boxes"] = sum(len(boxes) for _, boxes, _ in vindr_train.records)
             split_info["vindr_input_size"] = effective_vindr_input
             split_info["vindr_negative_ratio"] = vindr_negative_ratio
             split_info["mixed_input_sizes"] = effective_vindr_input != input_size

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Per-run training diagnostics and the precision-side metrics, for the supervisor review.
 
 Answers the request for "loss graphs (train vs val), sensitivity over epochs, precision,
@@ -204,7 +204,7 @@ def recipe_key(run):
     return "+".join(parts)
 
 
-def load(target, seed=None, recipe=None, run_group=None):
+def load(target, seed=None, recipe=None, run_group=None, input_size=1024):
     """
     Every fcos run at this target, keyed by (variant, seed, recipe tag).
 
@@ -230,7 +230,12 @@ def load(target, seed=None, recipe=None, run_group=None):
             continue
 
         if run.get("head") != "fcos" or run.get("letterbox"): continue
-        if run.get("input_size") != 1024 or run.get("target_size") != target: continue
+        # Input resolution is an EXPERIMENTAL AXIS as of 2026-09-18, not a constant. It was
+        # hardcoded to 1024 here, so runs at any other input were dropped without a word -
+        # the silent-filter failure this project has hit repeatedly. Runs at different
+        # inputs are NOT comparable (decimation ratio differs), so they are separated here
+        # rather than merged, but the caller now chooses which input to look at.
+        if run.get("input_size") != input_size or run.get("target_size") != target: continue
         if run.get("variant") not in COLOURS: continue
         if seed is not None and run.get("seed") != seed: continue
 
@@ -495,8 +500,18 @@ def print_metrics_table(runs, target, tag=""):
 
 
 def main():
+    # Module-level so every figure-writing helper below picks it up without
+    # threading the path through each signature
+    global OUT_DIR
+
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", type=int, default=384, choices=[224, 256, 384, 512])
+    # No choices= here. The allowlist that used to sit on this argument predated the
+    # 768 and 1024 runs and would have rejected them, which is the same failure the
+    # --variant allowlist caused in the v15 sweep.
+    parser.add_argument("--target", type=int, default=384)
+    parser.add_argument("--input-size", type=int, default=1024,
+                        help="Resizer INPUT resolution. Runs at different inputs face "
+                             "different decimation ratios and are never merged.")
     parser.add_argument("--seed",   type=int, default=None,
                         help="Restrict the training-curve panels to one seed.")
     parser.add_argument("--recipe", type=str, default=None,
@@ -509,7 +524,13 @@ def main():
                              "runs from before and after the 2026-08-27 INTER_AREA fix, "
                              "which is not recorded in metrics.json and so cannot appear in "
                              "the recipe tag.")
+    parser.add_argument("--out-dir", default=str(OUT_DIR),
+                        help="Directory for the figures. Point this somewhere separate when "
+                             "regenerating an old result set, so the new files cannot be "
+                             "confused with the current ones.")
     arguments = parser.parse_args()
+
+    OUT_DIR = Path(arguments.out_dir)
 
     import matplotlib
     matplotlib.use("Agg")
@@ -517,7 +538,8 @@ def main():
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    all_runs = load(arguments.target, recipe=arguments.recipe, run_group=arguments.run_group)
+    all_runs = load(arguments.target, recipe=arguments.recipe, run_group=arguments.run_group,
+                    input_size=arguments.input_size)
 
     if not all_runs:
         print("No fcos runs at target {}. Run from the Model/ directory.".format(arguments.target))
@@ -554,6 +576,11 @@ def main():
         # Commas survive into filenames and make the path awkward to quote in a shell,
         # so a multi-group request joins with "+" instead
         file_tag += "_" + "+".join(g.strip() for g in arguments.run_group.split(",") if g.strip())
+
+    # Input belongs in the filename for the same reason the recipe does: two sweeps that
+    # differ only by input would otherwise overwrite each other.
+    if arguments.input_size != 1024:
+        file_tag += "_i{}".format(arguments.input_size)
 
     # Curves are per-run, so restrict to one seed to keep the grid readable
     curve_seed = arguments.seed if arguments.seed is not None else 42
@@ -615,3 +642,4 @@ if __name__ == "__main__":
         _demo()
     else:
         main()
+

@@ -17,9 +17,14 @@ class NoduleDetector(nn.Module):
     }
 
     def __init__(self, variant="bilinear", head="centernet", backbone="convnext_fpn",
-                 heatmap_size=128, target_size=None):
+                 heatmap_size=128, target_size=None, num_classes=1):
         super().__init__()
         self.variant = variant
+
+        # 1 for the NODE21 nodule track, 14 for the VinDr multi-class sweep. Defaulting to
+        # 1 keeps every banked checkpoint loadable: the head's output channel count is part
+        # of the state dict, so changing this default would break them all.
+        self.num_classes = num_classes
 
         # Load from registries. Pass target_size iff the variant accepts it - keeps
         # legacy variants (that hardcode their own default) working unchanged.
@@ -35,7 +40,7 @@ class NoduleDetector(nn.Module):
 
         if head not in self.HEADS:
             raise KeyError(f"Head {head} not found. Available: {list(self.HEADS.keys())}")
-        self.head = self.HEADS[head](in_ch=256, num_classes=1)
+        self.head = self.HEADS[head](in_ch=256, num_classes=num_classes)
 
         # centernet_det returns a dict of three branches; the older heads return a bare
         # heatmap tensor. Callers branch on this rather than sniffing the output type.
