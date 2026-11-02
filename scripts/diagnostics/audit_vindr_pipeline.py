@@ -31,14 +31,13 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src.data.vindr import (VinDrDataset, NUM_VINDR_CLASSES, MAX_OBJECTS, VINDR_CLASSES,
-                            fuse_reader_boxes, fuse_reader_boxes_by_class)
+                            VINDR_ROOT, fuse_reader_boxes, fuse_reader_boxes_by_class)
 from src.data.vindr_split import build_vindr_multilabel_split, repeat_factors
 from src.evaluation.fcos_targets import make_fcos_targets
 from src.evaluation.vindr_multilabel_metrics import evaluate
 from src.losses.fcos import _focal
 from src.models.detector import NoduleDetector
 
-VINDR_ROOT = Path(r"D:\Downloads\vinbigdata-chest-xray-abnormalities-detection")
 ANNOTATIONS = VINDR_ROOT / "train.csv"
 IMAGES = VINDR_ROOT / "train_png16"
 

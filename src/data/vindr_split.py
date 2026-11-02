@@ -54,7 +54,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from src.data.vindr import CLASS_TO_INDEX, NO_FINDING_CLASS, VINDR_CLASSES
+from src.data.vindr import CLASS_TO_INDEX, NO_FINDING_CLASS, VINDR_CLASSES, VINDR_ROOT
 
 
 def load_film_labels(annotations_csv):
@@ -205,9 +205,7 @@ def repeat_factors(annotations_csv, image_ids, power=0.5, maximum=8.0):
 
 def _demo():
     """Self-check on the real annotations: disjointness, quotas, and the rare classes."""
-    import pathlib
-
-    root = pathlib.Path(r"D:\Downloads\vinbigdata-chest-xray-abnormalities-detection")
+    root = VINDR_ROOT
     annotations = root / "train.csv"
 
     # The readable set, not the CSV's 15,000 - this is what the sweep actually runs on
