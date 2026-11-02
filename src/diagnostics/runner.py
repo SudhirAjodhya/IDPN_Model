@@ -1,8 +1,7 @@
 from .mechanism_diagnostics import (
     diagnose_alpha, diagnose_gamma, diagnose_bilinear_mse,
     diagnose_gradient_flow, snapshot_saliency_params, diagnose_param_drift,
-    diagnose_delta, diagnose_lip, diagnose_talebi, diagnose_saliency_talebi,
-    diagnose_inverse_bone_talebi,
+    diagnose_delta, diagnose_lip, diagnose_talebi,
 )
 
 def run_diagnostics(model, val_loader, variant, epoch, initial_params, device, lung_bbox_512, mediastinum_bbox_512):
@@ -26,27 +25,6 @@ def run_diagnostics(model, val_loader, variant, epoch, initial_params, device, l
               f"({'lung-focused' if ratio > 1 else 'med-focused'}) "
               f"mse_vs_bilinear={mse_stats.get('mse_vs_bilinear', -1):.6f}")
 
-    elif variant == "saliency_talebi":
-        d_stats   = diagnose_saliency_talebi(model, diag_images,
-                                              lung_bbox_512, mediastinum_bbox_512)
-        mse_stats = {"mse_vs_bilinear": d_stats.get("mse_vs_bilinear", -1)}
-        ratio     = d_stats.get("lung_to_med_ratio", -1)
-        sal_ratio = d_stats.get("saliency_lung_to_med_ratio", -1)
-        print(f"  [saliency_talebi] resid_mean={d_stats.get('residual_mean_abs', -1):.6f} "
-              f"residual lung:med={ratio:.3f} "
-              f"saliency lung:med={sal_ratio:.3f} "
-              f"({'saliency-gating lung' if sal_ratio > 1 else 'uniform gating'}) "
-              f"mse_vs_bilinear={mse_stats.get('mse_vs_bilinear', -1):.6f}")
-
-    elif variant == "inverse_bone_talebi":
-        d_stats   = diagnose_inverse_bone_talebi(model, diag_images,
-                                                  lung_bbox_512, mediastinum_bbox_512)
-        mse_stats = {"mse_vs_bilinear": d_stats.get("mse_vs_bilinear", -1)}
-        print(f"  [inverse_bone] gate lung:med={d_stats.get('gate_lung_to_med', -1):.3f} "
-              f"gated_resid lung:med={d_stats.get('gated_resid_lung_to_med', -1):.3f} "
-              f"raw_resid={d_stats.get('residual_raw_mean', -1):.4f} "
-              f"({'gate OK' if d_stats.get('gate_lung_to_med', 0) > 1 else 'gate WRONG DIRECTION'})")
-
     elif variant == "talebi_aux":
         d_stats   = diagnose_talebi(model, diag_images, lung_bbox_512, mediastinum_bbox_512)
         mse_stats = {"mse_vs_bilinear": d_stats.get("mse_vs_bilinear", -1)}
@@ -69,10 +47,6 @@ def run_diagnostics(model, val_loader, variant, epoch, initial_params, device, l
         mse_stats = diagnose_bilinear_mse(model, diag_images)
         print(f"  [lip] ratio={d_stats.get('importance_ratio', -1):.3f} "
               f"mse_vs_bilinear={mse_stats.get('mse_vs_bilinear', -1):.6f}")
-
-    elif variant == "blurpool":
-        mse_stats = diagnose_bilinear_mse(model, diag_images)
-        print(f"  [blurpool] mse_vs_bilinear={mse_stats.get('mse_vs_bilinear', -1):.6f}")
 
     if initial_params:
         drift = diagnose_param_drift(model, variant, initial_params)

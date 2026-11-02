@@ -246,78 +246,6 @@ def diagnose_talebi(model, image_batch, lung_bbox, mediastinum_bbox, target_size
     }
 
 
-def diagnose_saliency_talebi(model, image_batch, lung_bbox, mediastinum_bbox,
-                               target_size=512):
-    """Talebi diagnostics + saliency gate statistics."""
-    talebi_stats = diagnose_talebi(model, image_batch, lung_bbox, mediastinum_bbox,
-                                    target_size=target_size)
-
-    ldm = model.ldm
-    with torch.no_grad():
-        x_bilinear    = F.interpolate(image_batch, size=(target_size, target_size),
-                                       mode="bilinear", align_corners=False)
-        saliency_logit = ldm.saliency(x_bilinear)
-        saliency_gate  = torch.sigmoid(saliency_logit)
-
-    y0, y1, x0, x1 = lung_bbox
-    lung_sal = saliency_gate[:, :, y0:y1, x0:x1].mean().item()
-    y0, y1, x0, x1 = mediastinum_bbox
-    med_sal  = saliency_gate[:, :, y0:y1, x0:x1].mean().item()
-
-    return {
-        **talebi_stats,
-        "saliency_mean":             saliency_gate.mean().item(),
-        "saliency_lung":             lung_sal,
-        "saliency_med":              med_sal,
-        "saliency_lung_to_med_ratio": lung_sal / (med_sal + 1e-8),
-        "saliency_std":              saliency_gate.std().item(),
-    }
-
-
-def diagnose_inverse_bone_talebi(model, image_batch, lung_bbox, mediastinum_bbox,
-                                  target_size=512):
-    """
-    Verify the soft-tissue gate directs the residual toward lung (not mediastinum).
-    gate_lung_to_med > 1 confirms the Sobel-inversion logic is correct.
-    """
-    ldm = model.ldm
-    with torch.no_grad():
-        x_bilinear = F.interpolate(image_batch, size=(target_size, target_size),
-                                    mode="bilinear", align_corners=False)
-        gate = ldm._compute_soft_tissue_gate(x_bilinear)
-
-        x_1024 = F.interpolate(image_batch, size=(1024, 1024),
-                                mode="bilinear", align_corners=False)
-        feat = ldm.input_conv(x_1024)
-        feat = ldm.res_blocks(feat)
-        feat = F.interpolate(feat, size=(target_size, target_size),
-                             mode="bilinear", align_corners=False)
-        residual = ldm.output_conv(feat)
-        gated_residual = gate * residual
-
-    y0, y1, x0, x1 = lung_bbox
-    lung_gate = gate[:, :, y0:y1, x0:x1].mean().item()
-    lung_gated_resid = gated_residual[:, :, y0:y1, x0:x1].abs().mean().item()
-    y0, y1, x0, x1 = mediastinum_bbox
-    med_gate = gate[:, :, y0:y1, x0:x1].mean().item()
-    med_gated_resid = gated_residual[:, :, y0:y1, x0:x1].abs().mean().item()
-
-    bilinear = F.interpolate(image_batch, size=(target_size, target_size),
-                              mode="bilinear", align_corners=False)
-    mse_vs_bilinear = ((ldm(image_batch) - bilinear) ** 2).mean().item()
-
-    return {
-        "gate_lung_mean": lung_gate,
-        "gate_med_mean": med_gate,
-        "gate_lung_to_med": lung_gate / (med_gate + 1e-8),
-        "gated_resid_lung": lung_gated_resid,
-        "gated_resid_med": med_gated_resid,
-        "gated_resid_lung_to_med": lung_gated_resid / (med_gated_resid + 1e-8),
-        "residual_raw_mean": residual.abs().mean().item(),
-        "mse_vs_bilinear": mse_vs_bilinear,
-    }
-
-
 def _saliency_params(model, variant):
     """The mechanism's saliency/residual parameters for each variant."""
     if variant == "alpha":
@@ -332,7 +260,7 @@ def _saliency_params(model, variant):
         return list(ldm.weighted_pool.saliency.parameters()), "gamma-innet saliency"
     elif variant == "lip":
         return list(model.ldm.parameters()), "LIP"
-    elif variant in ("talebi", "saliency_talebi", "inverse_bone_talebi", "talebi_aux"):
+    elif variant in ("talebi", "talebi_aux"):
         return list(model.ldm.parameters()), f"{variant} LDM"
     return None, None
 
@@ -375,7 +303,7 @@ def _saliency_named_params(model, variant):
         if ldm is None:
             return {}
         return dict(ldm.named_parameters())
-    elif variant in ("lip", "talebi", "saliency_talebi", "inverse_bone_talebi", "talebi_aux"):
+    elif variant in ("lip", "talebi", "talebi_aux"):
         return dict(model.ldm.named_parameters())
     return {}
 
