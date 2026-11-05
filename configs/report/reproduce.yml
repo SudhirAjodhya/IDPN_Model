@@ -1,0 +1,138 @@
+# yml to run to reproduce experiemnt
+#     python -m scripts.reproduce --dry-run              # list everything, run nothing
+#     python -m scripts.reproduce --stage node21         # one stage
+#     python -m scripts.reproduce                        # all stages, in order
+
+# VinDr is read from data_sets/vindr (train.csv and train/*.dicom)
+# To keep it on another drive, set the VINDR_ROOT environment variable; see src/data/vindr.py.
+paths:
+  figures: outputs/report_figures
+
+smoke_args: "--epochs 1"
+
+stages:
+
+  # Data prep, CLAHE, resize, cache
+  prepare:
+    commands:
+      - python -m scripts.warm_vindr_cache --input-size 2048 --negative-ratio 1.0
+    expect:
+      - glob: "{vindr_root}/train_png16_cache_i2048/*.npy"
+        count: 8788
+  
+  # Node 21 Detection Runs
+  node21:
+    command: >-
+      python -u scripts/train.py
+      --backbone convnext_fpn --head fcos --variant {variant} --seed {seed}
+      --datasets node21_vindr --input-size 1024 --target-size {target}
+      --vindr-input-size 2048 --vindr-negative-ratio 1.0
+      --batch-size 4 --grad-accum 2 --lr 2e-4 --epochs 50 --patience 15
+      --select-on val_sens_matched --aug-profile v3 --val-frac 0.20
+      --run-group {run_group} --augment --froc --attribution
+    done_if:
+      run_group: "{run_group}"
+      variant: "{variant}"
+      target_size: "{target}"
+      seed: "{seed}"
+      input_size: "1024"
+      select_on: val_sens_matched
+      split_info.datasets: node21_vindr
+      split_info.vindr_input_size: "2048"
+    grids:
+      - run_group: [v15_selection_and_scale]
+        target: [224, 256, 384, 512]
+        seed: [42, 7, 123]
+        variant: [bilinear, node21_talebi_zeroinit]
+      - run_group: [v19_focal_norm_fix]
+        target: [768, 1024]
+        seed: [42, 7, 123]
+        variant: [bilinear, node21_talebi_zeroinit]
+
+  # Vindr multi-label 60/20/20 split, 36 runs
+  vindr:
+    command: >-
+      python -u scripts/train_vindr.py
+      --variant {variant} --backbone convnext_fpn --seed {seed} --split-seed 0
+      --input-size 2048 --target-size {target}
+      --batch-size {batch} --grad-accum {accum} --lr 2e-4 --epochs 100 --patience 15
+      --select-smoothing 5 --min-delta 0.0005 --aug-profile v3 --num-workers 6
+      --run-group {run_group} --augment --oversample
+    done_if:
+      run_group: "{run_group}"
+      variant: "{variant}"
+      target_size: "{target}"
+      seed: "{seed}"
+    grids:
+      - run_group: [v23_vindr_3seed]
+        target: [224, 256, 384, 512]
+        batch: [8]
+        accum: [1]
+        seed: [42, 7, 123]
+        variant: [bilinear, node21_talebi_zeroinit]
+      - run_group: [v23_vindr_3seed]
+        target: [768, 1024]
+        batch: [4]
+        accum: [2]
+        seed: [42, 7, 123]
+        variant: [bilinear, node21_talebi_zeroinit]
+
+  # cache vindr checkpoints
+  score:
+    commands:
+      - python -m scripts.eval.score_vindr_checkpoints --run-group v23_vindr_3seed
+
+  tables:
+    commands:
+      - python -m scripts.eval.report_tables
+      - python -m scripts.eval.frequency_bands --films 20 --seed 42
+      - python -m scripts.eval.frequency_bands_vindr --films 100
+
+  # --------------------------------------------------------------------------------------
+  # Figures. Each command writes into {figures}; `copy` then gives the files the names the
+  # report's images/ directory uses. {run:...} resolves to a run directory by its fields.
+  # The scripts also print the numbers quoted in the Discussion: plot_vindr_sweep the
+  # per-class gains. The frequency-band table comes from the tables stage.
+  # --------------------------------------------------------------------------------------
+  figures:
+    commands:
+      - >-
+        python -m scripts.eval.plot_supervisor_figures
+        --recipe node21_vindr+vin2048+vnr1+sel-val_sens_matched
+        --run-group v15_selection_and_scale,v19_focal_norm_fix --out-dir {figures}
+      - >-
+        python -m scripts.eval.plot_size_stratified
+        --recipe node21_vindr+vin2048+vnr1+sel-val_sens_matched
+        --run-group v15_selection_and_scale,v19_focal_norm_fix --out-dir {figures}
+      - python -m scripts.eval.plot_vindr_sweep --run-group v23_vindr_3seed --out-dir {figures}
+      - python -m scripts.eval.plot_report_results --out-dir {figures}
+      - >-
+        python -m scripts.eval.plot_residual_across_decimation
+        --film n1076 --targets 224 384 768 1024 --seed 42 --out-dir {figures}
+      - >-
+        python -m scripts.eval.plot_resizer_branches
+        --film n1076 --target 224 --seed 42 --out-dir {figures}
+      - python -m scripts.eval.plot_decimation_cost --film n0189 --out-dir {figures}
+      - >-
+        python -m scripts.eval.plot_decimation_cost --dataset vindr
+        --film d106ec9b305178f3da060efe3191499a --out-dir {figures}
+      - >-
+        python scripts/eval/compare_resizer_outputs.py
+        --a {run:run_group=v15_selection_and_scale,variant=bilinear,target_size=224,seed=42,split_info.datasets=node21_vindr}
+        --b {run:run_group=v15_selection_and_scale,variant=node21_talebi_zeroinit,target_size=224,seed=42,split_info.datasets=node21_vindr}
+        --films n1076 n1032 n0757 n0637 --out {figures}
+    copy:
+      fig1_resolution_sweep_*v19_focal_norm_fix.png:   node21_resolution_sweep.png
+      fig2_mechanism_enrichment_*v19_focal_norm_fix.png: node21_residual_enrichment.png
+      fig4_froc_grid_*v19_focal_norm_fix.png:          node21_froc_grid.png
+      fig8_size_bars_*v19_focal_norm_fix.png:          node21_size_bars.png
+      fig12_vindr_sweep_v23_vindr_3seed.png:           vindr_sweep.png
+      fig13_vindr_per_class_v23_vindr_3seed.png:       vindr_per_class.png
+      results_vindr_delta.png:                         results_vindr_delta.png
+      results_node21_froc.png:                         results_node21_froc.png
+      results_vindr_per_class.png:                     results_vindr_per_class.png
+      fig14_residual_across_decimation_n1076.png:      residual_across_decimation.png
+      fig15_resizer_branches_n1076_t224.png:           resizer_branches.png
+      fig01_decimation_cost_node21_n0189.png:          fig01_decimation_cost_node21_n0189.png
+      fig01_decimation_cost_vindr_d106ec9b3051.png:    decimation_cost_vindr.png
+      resizer_comparison_bilinear_vs_node21_talebi_zeroinit_i1024_t224.png: qualitative_resizer_cases.png

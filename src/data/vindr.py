@@ -37,6 +37,9 @@ from torch.utils.data import Dataset
 from src.data.augmentation import resize_preserving_detail
 from src.data.node21 import AUGMENTATION_PROFILES, NODE21Dataset
 
+# The Kaggle download (train.csv and train/*.dicom) sits in data_sets/vindr
+VINDR_ROOT = Path(os.environ.get("VINDR_ROOT", Path(__file__).resolve().parents[2] / "data_sets" / "vindr"))
+
 # VinDr films carry far more boxes than NODE21's three. After fusion the distribution is
 # median 3, p99 15, max 39. 16 covers the 99th percentile; the ~1% of films above it are
 # truncated, which costs a handful of boxes on already box-dense films.

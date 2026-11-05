@@ -56,8 +56,6 @@ COLOURS = {
     # groups are separate precisely so that mixing does not happen by accident.
     "bilinear_antialias":             "#2F4B73",
     "bicubic_antialias":              "#55843F",
-    "node21_talebi_zeroinit_aa":      "#8C2F33",
-    "node21_talebi_zeroinit_attn_aa": "#584C7D",
 }
 LABELS = {
     "bilinear":                    "Bilinear",
@@ -66,12 +64,9 @@ LABELS = {
     "node21_talebi_zeroinit_attn": "Talebi + attention",
     "bilinear_antialias":             "Bilinear + anti-alias",
     "bicubic_antialias":              "Bicubic + anti-alias",
-    "node21_talebi_zeroinit_aa":      "Talebi (zero-init) + AA",
-    "node21_talebi_zeroinit_attn_aa": "Talebi + attention + AA",
 }
 ORDER = ["bilinear", "bilinear_antialias", "bicubic_antialias", "node21_talebi",
-         "node21_talebi_zeroinit", "node21_talebi_zeroinit_aa",
-         "node21_talebi_zeroinit_attn", "node21_talebi_zeroinit_attn_aa"]
+         "node21_talebi_zeroinit", "node21_talebi_zeroinit_attn"]
 
 
 def run_group_matches(run, run_group):

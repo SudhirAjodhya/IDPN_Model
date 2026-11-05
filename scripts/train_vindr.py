@@ -43,14 +43,13 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from src.data.vindr import VinDrDataset, NUM_VINDR_CLASSES, MAX_OBJECTS
+from src.data.vindr import VinDrDataset, NUM_VINDR_CLASSES, MAX_OBJECTS, VINDR_ROOT
 from src.data.vindr_split import build_vindr_multilabel_split, repeat_factors
 from src.evaluation.fcos_targets import make_fcos_targets
 from src.evaluation.vindr_multilabel_metrics import evaluate, format_report, image_scores
 from src.losses.fcos import fcos_loss
 from src.models.detector import NoduleDetector
 
-VINDR_ROOT = Path(r"D:\Downloads\vinbigdata-chest-xray-abnormalities-detection")
 ANNOTATIONS = VINDR_ROOT / "train.csv"
 IMAGES = VINDR_ROOT / "train_png16"
 

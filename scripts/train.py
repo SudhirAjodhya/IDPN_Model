@@ -42,9 +42,7 @@ JSRT_IMAGE_DIR = DATA_DIR / "JSRT" / "images" / "images"
 JSRT_CSV_PATH = DATA_DIR / "JSRT" / "jsrt_metadata.csv"
 NODE21_IMAGE_DIR = DATA_DIR / "node21" / "cxr_images" / "original_data" / "images"
 NODE21_CSV_PATH = DATA_DIR / "node21" / "cxr_images" / "original_data" / "metadata.csv"
-# VinDr-CXR lives outside the repo data_sets tree because the PNG16 archive is ~125 GB.
-# Written by scripts/preprocess_vindr.py from the original DICOM download.
-VINDR_ROOT = Path("D:/Downloads/vinbigdata-chest-xray-abnormalities-detection")
+from src.data.vindr import VINDR_ROOT                       # data_sets/vindr unless overridden
 VINDR_IMAGE_DIR = VINDR_ROOT / "train_png16"
 VINDR_DICOM_DIR = VINDR_ROOT / "train"          # fallback when the PNG archive is absent
 VINDR_CSV_PATH = VINDR_ROOT / "train.csv"
@@ -100,11 +98,6 @@ LOSS_FNS = {
 # was not updated, so a 12-run sweep died at run 1 with "invalid choice" after passing the
 # smoke test - argparse rejected keys the model layer had accepted all along. Deriving the
 # choices makes registering a variant sufficient to run it.
-#
-# NOTE ON WARP VARIANTS (node21_ldm_warp*, 2026-08-23 offset-bound sweep): run
-# scripts/diagnostics/warp_label_displacement.py before reading their detection numbers.
-# The linear target rule in fcos_targets.py is only valid while label displacement stays
-# small relative to nodule size, and it scales with max_offset.
 import src.models.downsamplers                                       # noqa: F401  (registers)
 from src.core.registry import DOWNSAMPLER_REGISTRY
 
@@ -385,7 +378,7 @@ def main():
 
     scaler = GradScaler(device=device.type, enabled=False)
 
-    NO_PARAM_VARIANTS = {"bilinear", "blurpool"}
+    NO_PARAM_VARIANTS = {"bilinear"}
     initial_params = ({} if args.variant in NO_PARAM_VARIANTS else snapshot_saliency_params(model, args.variant))
 
     # centernet_det supplies its own composite loss inside the trainer; loss_fn stays

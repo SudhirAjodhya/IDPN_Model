@@ -39,6 +39,7 @@ import numpy as np
 from scripts.eval.plot_run_diagnostics import recipe_key
 
 BUDGET = 0.25
+CPM_BUDGETS = (0.125, 0.25, 0.5, 1, 2, 4, 8)   # FP/img points averaged into the CPM score
 BINOMIAL_SE = 0.041                       # n = 147 test nodules
 OUT_DIR = Path("outputs/figures")
 
@@ -141,6 +142,9 @@ def load(head, recipe="", run_group=None, exclude_run_group=None, input_size=102
         key = (run["variant"], run["target_size"])
         runs.setdefault(key, {})[run["seed"]] = {
             "matched":     sensitivity_at_budget(box_metrics["froc"]),
+            "cpm":         float(np.mean([sensitivity_at_budget(box_metrics["froc"], budget)
+                                          for budget in CPM_BUDGETS])),
+            "ap":          box_metrics["average_precision"],
             "attribution": run.get("attribution") or {},
             # How many stored curve points sit below 1 FP/img. Rank-sampled curves (pre
             # 2026-08-31) leave a gap straddling the 0.25 budget, so the reported number is

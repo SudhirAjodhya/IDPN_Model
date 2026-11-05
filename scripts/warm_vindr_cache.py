@@ -28,9 +28,7 @@ from pathlib import Path
 
 from torch.utils.data import DataLoader
 
-from src.data.vindr import VinDrDataset
-
-VINDR_ROOT = Path("D:/Downloads/vinbigdata-chest-xray-abnormalities-detection")
+from src.data.vindr import VINDR_ROOT, VinDrDataset
 
 
 def main() -> None:

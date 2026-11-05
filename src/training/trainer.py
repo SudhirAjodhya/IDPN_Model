@@ -145,7 +145,7 @@ def train_one_epoch(
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
             if (epoch == 1 and batch_idx == 4
-                    and variant not in ("bilinear", "blurpool")
+                    and variant != "bilinear"
                     and not grad_flow_checked):
                 ldm_params = [(n, p) for n, p in model.ldm.named_parameters() if p.requires_grad]
                 if ldm_params:

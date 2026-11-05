@@ -1,15 +1,16 @@
 ﻿"""Shared augmentation helpers for CXR data.
 
-CLAHE (Contrast-Limited Adaptive Histogram Equalization) is standard preprocessing
-for CXR nodule detection. Boosts local contrast around low-visibility nodules and
-is used by essentially every recent Node21 leaderboard entry."""
+CLAHE (Contrast-Limited Adaptive Histogram Equalization) boosts local contrast
+around low-visibility findings, tile by tile, without the noise amplification of
+unclipped adaptive equalization."""
 from __future__ import annotations
 
 import cv2
 import numpy as np
 
-# Single CLAHE instance is reused. clip_limit=2.0 and tile=8x8 are the values
-# recommended by MONAI and by the Node21 challenge organisers' baseline.
+# Single CLAHE instance is reused. clip_limit=2.0 is on OpenCV's scale (multiples
+# of the mean histogram bin height; OpenCV's default is 40) and the 8x8 tile grid
+# is OpenCV's default. Both were fixed before the experiments and never tuned.
 _CLAHE = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
 

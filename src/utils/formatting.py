@@ -2,14 +2,11 @@ def print_banner(args, split_info, model, device, input_size=2048):
     names = {
         "bilinear":            "Bilinear Baseline",
         "talebi":              "Talebi Resizer (n_blocks=2)",
-        "saliency_talebi":     "Saliency-Gated Talebi (v7 non-zero init)",
-        "inverse_bone_talebi": "Inverse-Bone Talebi (fixed Sobel gate)",
         "talebi_aux":          "Talebi + Aux Lung Supervision",
         "alpha":               "Simple Residual",
         "gamma":               "Weighted Pooling",
         "delta":               "Learned Kernel",
         "lip":                 "LIP",
-        "blurpool":            "BlurPool",
         "node21_talebi":       "Talebi (paper-faithful, Node21-only)",
     }
     j = split_info.get("test_jsrt", 0)

@@ -117,8 +117,8 @@ class TalebiPaperResizer(nn.Module):
 class TalebiPaperResizerZeroInit(TalebiPaperResizer):
     """
     Paper-faithful Talebi with near-zero init on output_conv (kaiming * 0.01, bias = 0). At step 1 residual ~= 0 so model output ~= bilinear -- Talebi
-    starts strictly >= bilinear and can only improve. Same near-zero pattern that talebi_saliency + talebi_inverse_bone use after v6->v7's "pure zero
-    kills upstream gradients" finding.
+    starts strictly >= bilinear and can only improve. Near-zero rather than exactly zero: a pure-zero output layer
+    passes no gradient back to the layers before it.
     """
     def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224,
                  skip_mode="bilinear", skip_antialias=False):
@@ -129,26 +129,6 @@ class TalebiPaperResizerZeroInit(TalebiPaperResizer):
         nn.init.kaiming_normal_(self.output_conv.weight, a=0.2)
         self.output_conv.weight.data *= 0.01
         nn.init.zeros_(self.output_conv.bias)
-
-
-@DOWNSAMPLER_REGISTRY.register("node21_talebi_zeroinit_aa")
-class TalebiPaperResizerZeroInitAntialias(TalebiPaperResizerZeroInit):
-    """
-    node21_talebi_zeroinit with an ANTI-ALIASED geometric skip. Pair this with the
-    `bilinear_antialias` baseline, never with `bilinear`.
-
-    The point: plain `bilinear` aliases hard at these decimation factors (9.1x at target
-    224), which is the very defect the learned residual is hypothesised to repair. Beating
-    it may therefore show only that anti-aliasing helps. This arm holds the classical base
-    at its best, so any remaining gap is attributable to LEARNING rather than filtering.
-
-    At init the residual is ~0, so this starts at anti-aliased bilinear and can only improve
-    on it - the same guarantee node21_talebi_zeroinit has against plain bilinear.
-    """
-
-    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224):
-        super().__init__(in_channels=in_channels, n_filters=n_filters, n_blocks=n_blocks,
-                         target_size=target_size, skip_mode="bilinear", skip_antialias=True)
 
 
 @DOWNSAMPLER_REGISTRY.register("node21_talebi_zeroinit_wide")
@@ -287,23 +267,6 @@ class TalebiPaperResizerZeroInitAttn(TalebiPaperResizer):
         return x_bilinear + residual
 
 
-@DOWNSAMPLER_REGISTRY.register("node21_talebi_zeroinit_attn_aa")
-class TalebiPaperResizerZeroInitAttnAntialias(TalebiPaperResizerZeroInitAttn):
-    """
-    node21_talebi_zeroinit_attn with an ANTI-ALIASED geometric skip.
-
-    Pair with `bilinear_antialias`, never with `bilinear`. Exists so the attention ablation
-    can be read against the same classical base as node21_talebi_zeroinit_aa - otherwise a
-    three-way comparison silently mixes two different baselines.
-    """
-
-    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=224,
-                 attn_res=128, attn_window=8, attn_heads=2):
-        super().__init__(in_channels=in_channels, n_filters=n_filters, n_blocks=n_blocks,
-                         target_size=target_size, attn_res=attn_res, attn_window=attn_window,
-                         attn_heads=attn_heads, skip_mode="bilinear", skip_antialias=True)
-
-
 @DOWNSAMPLER_REGISTRY.register("talebi")
 class TalebiResizer(nn.Module):
     """
@@ -339,127 +302,3 @@ class TalebiResizer(nn.Module):
                              mode="bilinear", align_corners=False)
         residual = self.output_conv(feat)
         return x_bilinear + residual
-
-
-@DOWNSAMPLER_REGISTRY.register("talebi_saliency")
-class SaliencyTalebiResizer(nn.Module):
-    """
-    Talebi resizer with saliency gating on the residual.
-    output = bilinear(x) + sigmoid(saliency(bilinear(x))) * residual_cnn(x)
-    Saliency is computed on the cheap low-res view; zero-init on saliency final
-    conv gives sigmoid(0)=0.5 uniform gating at init. output_conv uses small
-    kaiming init (v7 fix: zero-init killed upstream gradients in v6).
-    """
-
-    def __init__(self, in_channels=1, n_filters=16, n_blocks=2,
-                 saliency_channels=8, target_size=512):
-        super().__init__()
-        self.target_size = target_size
-
-        self.input_conv = nn.Sequential(
-            nn.Conv2d(in_channels, n_filters, 7, padding=3),
-            nn.BatchNorm2d(n_filters),
-            nn.LeakyReLU(0.2, inplace=True),
-        )
-        self.res_blocks = nn.Sequential(*[
-            _TalebiResBlock(n_filters) for _ in range(n_blocks)
-        ])
-        self.output_conv = nn.Conv2d(n_filters, in_channels, 7, padding=3)
-        nn.init.kaiming_normal_(self.output_conv.weight, a=0.2)
-        self.output_conv.weight.data *= 0.01
-        nn.init.zeros_(self.output_conv.bias)
-
-        self.saliency = nn.Sequential(
-            nn.Conv2d(in_channels, saliency_channels, 5, padding=2),
-            nn.BatchNorm2d(saliency_channels),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(saliency_channels, saliency_channels, 3, padding=1),
-            nn.BatchNorm2d(saliency_channels),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(saliency_channels, 1, 1),
-        )
-        nn.init.zeros_(self.saliency[-1].weight)
-        nn.init.zeros_(self.saliency[-1].bias)
-
-    def forward(self, x_2048):
-        x_bilinear = F.interpolate(x_2048, size=(self.target_size, self.target_size),
-                                    mode="bilinear", align_corners=False)
-
-        saliency_logit = self.saliency(x_bilinear)       # (B, 1, target, target)
-        saliency_gate  = torch.sigmoid(saliency_logit)   # [0, 1] gating
-
-        x_1024 = F.interpolate(x_2048, size=(1024, 1024),
-                                mode="bilinear", align_corners=False)
-        feat = self.input_conv(x_1024)
-        feat = self.res_blocks(feat)
-        feat = F.interpolate(feat, size=(self.target_size, self.target_size),
-                             mode="bilinear", align_corners=False)
-        residual = self.output_conv(feat)
-
-        return x_bilinear + saliency_gate * residual
-
-
-@DOWNSAMPLER_REGISTRY.register("talebi_inverse_bone")
-class InverseBoneTalebiResizer(nn.Module):
-    """
-    Talebi resizer with a fixed inverse-bone-energy gate on the residual.
-
-    Sobel edge magnitude ≈ bone/mediastinal edges. Inverting it gives a
-    soft-tissue prior that concentrates the learned enhancement in the lungs.
-
-    output = bilinear(x) + soft_tissue_gate(x) * learned_residual(x)
-
-    Zero new learnable parameters vs vanilla Talebi; gate is hand-crafted.
-    output_conv uses small kaiming init so all layers get gradient from step 1.
-    """
-
-    def __init__(self, in_channels=1, n_filters=16, n_blocks=2, target_size=512):
-        super().__init__()
-        self.target_size = target_size
-
-        self.input_conv = nn.Sequential(
-            nn.Conv2d(in_channels, n_filters, 7, padding=3),
-            nn.BatchNorm2d(n_filters),
-            nn.LeakyReLU(0.2, inplace=True),
-        )
-        self.res_blocks = nn.Sequential(*[
-            _TalebiResBlock(n_filters) for _ in range(n_blocks)
-        ])
-        self.output_conv = nn.Conv2d(n_filters, in_channels, 7, padding=3)
-        nn.init.kaiming_normal_(self.output_conv.weight, a=0.2)
-        self.output_conv.weight.data *= 0.01
-        nn.init.zeros_(self.output_conv.bias)
-
-        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],
-                                dtype=torch.float32).view(1, 1, 3, 3)
-        sobel_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]],
-                                dtype=torch.float32).view(1, 1, 3, 3)
-        self.register_buffer("sobel_x", sobel_x)
-        self.register_buffer("sobel_y", sobel_y)
-
-    def _compute_soft_tissue_gate(self, x_512):
-        gx = F.conv2d(x_512, self.sobel_x, padding=1)
-        gy = F.conv2d(x_512, self.sobel_y, padding=1)
-        edge_energy = torch.sqrt(gx ** 2 + gy ** 2 + 1e-8)
-
-        edge_min = edge_energy.amin(dim=(2, 3), keepdim=True)
-        edge_max = edge_energy.amax(dim=(2, 3), keepdim=True)
-        edge_norm = (edge_energy - edge_min) / (edge_max - edge_min + 1e-8)
-
-        # Floor of 0.1 keeps 10% residual signal even over bone/ribs
-        return 1.0 - 0.9 * edge_norm
-
-    def forward(self, x_2048):
-        x_bilinear = F.interpolate(x_2048, size=(self.target_size, self.target_size),
-                                    mode="bilinear", align_corners=False)
-
-        x_1024 = F.interpolate(x_2048, size=(1024, 1024),
-                                mode="bilinear", align_corners=False)
-        feat = self.input_conv(x_1024)
-        feat = self.res_blocks(feat)
-        feat = F.interpolate(feat, size=(self.target_size, self.target_size),
-                             mode="bilinear", align_corners=False)
-        residual = self.output_conv(feat)
-
-        gate = self._compute_soft_tissue_gate(x_bilinear)
-        return x_bilinear + gate * residual

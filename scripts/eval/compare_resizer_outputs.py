@@ -57,6 +57,9 @@ DPI = 300
 CONTROLS_PER_BOX = 8          # matches scripts/diagnostics/residual_attribution.py
 
 
+DISPLAY_NAMES = {"node21_talebi_zeroinit": "Learned Resizer"}
+
+
 def load_model(run_dir: Path, device):
     """Rebuild a run's model from its metrics.json and checkpoint."""
     metrics = json.load(open(run_dir / "metrics.json"))
@@ -345,8 +348,12 @@ def main() -> None:
     per_film = arguments.out / f"resizer_comparison_{tag}.png"
     aggregate = arguments.out / f"resizer_aggregate_{tag}.png"
 
-    figure_per_film(records, label_a, label_b, per_film)
-    mean_abs = figure_aggregate(records, label_a, label_b, aggregate)
+    # Report-facing names on the figures; the file name keeps the variant ids
+    display_a = DISPLAY_NAMES.get(label_a, label_a)
+    display_b = DISPLAY_NAMES.get(label_b, label_b)
+
+    figure_per_film(records, display_a, display_b, per_film)
+    mean_abs = figure_aggregate(records, display_a, display_b, aggregate)
 
     nodule_values = [v for r in records for v in r["nodule_diff"]]
     control_values = [v for r in records for v in r["control_diff"]]
