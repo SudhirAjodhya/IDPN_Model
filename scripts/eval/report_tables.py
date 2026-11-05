@@ -85,10 +85,10 @@ def paired_statistics(deltas, ratios, metric):
     slope = stats.linregress(ratios, deltas)
 
     print("  {:<10} mean {:+.4f}  t = {:.2f}  p = {:.3f}  positive {}/{}  |  "
-          "slope vs decimation {:+.5f}/unit  r = {:+.3f}  p = {:.4f}".format(
+          "slope vs decimation {:+.5f}/unit  t = {:.2f}  r = {:+.3f}  p = {:.4f}".format(
               metric, np.mean(deltas), test.statistic, test.pvalue,
               sum(delta > 0 for delta in deltas), len(deltas),
-              slope.slope, slope.rvalue, slope.pvalue))
+              slope.slope, slope.slope / slope.stderr, slope.rvalue, slope.pvalue))
 
 
 def node21_table(node21_groups):
